@@ -83,4 +83,4 @@ Wire contract: [`docs/design.md`](docs/design.md).
 MIT — see [LICENSE](LICENSE). The Bosch BSEC2 binary is **not** MIT and is never vendored
 here; operators obtain it under Bosch's own terms.
 
-<sub>Banner pending — generate with <a href="https://github.com/buckster123/Imaginarium-RS">Imaginarium-RS</a> when we cut a public repo (doctrine #8: don't auto-fire).</sub>
+<sub>Banner generated with <a href="https://github.com/buckster123/Imaginarium-RS">Imaginarium-RS</a> (job <code>01M0AFFSXHHS71FTTG4ZAJJC3B</code>).</sub>
