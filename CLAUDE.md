@@ -92,8 +92,10 @@ Full rationale: `~/Projects/Launchpad-RS/docs/house-doctrine.md`. The nine, cond
 
 - **Never commit to `main`.** Feature branch off freshly-fetched `origin/main`: `feat/…`,
   `fix/…`, `chore/…`, `docs/…`. One branch = one slice.
-- **Ship via PR** (`gh pr create`). **Do NOT merge it yourself** — André reviews and merges,
-  or explicitly tells you to. (Pre-publication bootstrap commits are the sanctioned exception.)
+- **Ship via PR** (`gh pr create`). **This repo: FORGE may merge** (charter D8,
+  2026-08-18) after `cargo test --workspace` and clippy `-D warnings` are green.
+  Still one branch per slice; still no commit directly to `main`; still no
+  force-push.
 - **Commit format:** imperative, lowercase. End with the `Co-Authored-By` trailer.
 - **Never amend a pushed commit. Never force-push.**
 - **Push after every commit.** Local git is the floor of resilience: if Cerebro is

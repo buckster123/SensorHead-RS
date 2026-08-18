@@ -10,12 +10,14 @@ pub mod environment;
 pub mod error;
 pub mod iaq;
 pub mod ironbow;
+pub mod status;
 pub mod thermal;
 
 pub use environment::EnvironmentBody;
 pub use error::{Error, Result};
 pub use iaq::{iaq_accuracy_label, iaq_band};
 pub use ironbow::{render_heatmap, RgbImage, HEATMAP_HEIGHT, HEATMAP_WIDTH};
+pub use status::{compose_status, UpstreamView};
 pub use thermal::{
     clamp_celsius, frame_stats, ThermalBody, THERMAL_COLS, THERMAL_PIXELS, THERMAL_ROWS,
 };

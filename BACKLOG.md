@@ -24,6 +24,8 @@ pass (house doctrine #5). Notes carry the date and the evidence.
       Python still owns apex1 `:8080`.
       `deploy/sensorhead-api.service` sits on loopback `:18080` so a Pi
       install cannot clobber the live dashboard.
+      `/health` reports `version` + `git_sha`; `/api/status` is composed
+      (Rust envelope, upstream nests, honest camera error).
 - [ ] **S4 — field**: `SENSORHEAD_URL` on apex1 pointed at the Rust daemon; bridge still
       emits AirQuality + ThermalFrame; evidence recorded here.
 

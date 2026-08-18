@@ -55,6 +55,10 @@ rationale is lost gets re-litigated within a month.
 - **D7 — Field truth is apex1.** The SensorHead option is verified live there
   (BME688@0x77, MLX90640@0x33, I2C needs `i2c-dev` on Pi 5). Laptop work is types,
   parsers, and fixtures. A slice that talks to hardware is done only on the node.
+- **D8 — FORGE may merge on this repo.** André loosened the house "do not merge"
+  rule here on 2026-08-18: one branch, one slice, then commit → push → merge →
+  next, as long as `cargo test --workspace` and `clippy -- -D warnings` are
+  green. Still no force-push. Still no commit directly to `main`.
 
 ## Phases
 
@@ -105,3 +109,5 @@ Dated entries. A decision changes here first, then in the code.
 - **2026-08-18** — charter adopted. Source: `py-source/` at `buckster123/SensorHead`
   (clone tip `6da6541` on this laptop) plus ApexOS-RS `docs/gotchas.md` (sensor-head
   = external service).
+- **2026-08-18** — D8 adopted. André: cook with commit-push-merge while tests
+  stay green.
