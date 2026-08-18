@@ -43,13 +43,18 @@ cargo build --release --workspace
 
 ## Use
 
-Nothing ships a binary yet. The live head on a sensor node is still the Python dashboard:
+The live head on apex1 is still the Python dashboard on `:8080`. This binary is the
+drop-in face — it proxies the vendor walls and renders the thermal heatmap itself:
 
 ```sh
-# on the Pi, after the original is installed
-python3 -m sensor_head.dashboard --port 8080
-curl -s http://127.0.0.1:8080/api/environment
+cargo run -p sensorhead-api -- --bind 127.0.0.1:18080 --upstream http://192.168.0.158:8080
+curl -s http://127.0.0.1:18080/health
+curl -s http://127.0.0.1:18080/api/environment
 ```
+
+On a sensor node, stop the Python unit and bind `0.0.0.0:8080` with
+`SENSORHEAD_UPSTREAM` pointed at the Python process on a side port. Do not steal
+`:8080` from a running dashboard by accident — the default bind is loopback.
 
 ## How it works
 
@@ -76,6 +81,7 @@ Wire contract: [`docs/design.md`](docs/design.md).
 | [`docs/design.md`](docs/design.md) | The contract — wire format, API, invariants |
 | [`docs/upstream.md`](docs/upstream.md) | `py-source/` + BSEC2 / libcamera walls |
 | [`docs/CHARTER.md`](docs/CHARTER.md) | Binding decisions |
+| [`docs/deploy.md`](docs/deploy.md) | Sit beside the live Python unit on a Pi |
 | [`BACKLOG.md`](BACKLOG.md) | Slice ledger — what's shipped, what's next |
 
 ## License

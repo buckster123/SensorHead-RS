@@ -1,0 +1,12 @@
+{
+  "temperature_c": 21.5,
+  "humidity_pct": 48.0,
+  "pressure_hpa": 1001.2,
+  "raw_gas_resistance_ohm": 120000,
+  "altitude_m": 95.0,
+  "bsec_version": "N/A (raw mode)",
+  "iaq": null,
+  "air_quality": "raw_mode",
+  "air_quality_description": "BSEC unavailable \u2014 showing raw values only",
+  "timestamp": 0
+}

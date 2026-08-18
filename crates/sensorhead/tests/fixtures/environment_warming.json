@@ -1,0 +1,7 @@
+{
+  "error": true,
+  "sensor": "BME688",
+  "status": "warming_up",
+  "reason": "BSEC2 still stabilizing \u2014 data not yet available",
+  "bsec_version": "2.6.1.0"
+}

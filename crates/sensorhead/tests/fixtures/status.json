@@ -1,0 +1,52 @@
+{
+  "server": "SensorHead v0.4.0",
+  "timestamp": 1787057327.5492811,
+  "i2c_devices": {
+    "0x33": "MLX90640 (thermal)",
+    "0x77": "BME688 (environment, alt)"
+  },
+  "environment": {
+    "temperature_c": 22.34,
+    "humidity_pct": 52.9,
+    "pressure_hpa": 1000.77,
+    "iaq": 154.9,
+    "iaq_accuracy": 0,
+    "iaq_accuracy_label": "stabilizing",
+    "air_quality": "moderately_polluted",
+    "air_quality_description": "Increased discomfort likely",
+    "co2_equivalent_ppm": 1384.1,
+    "co2_accuracy": 0,
+    "breath_voc_ppm": 3.7117,
+    "breath_voc_accuracy": 0,
+    "gas_percentage": 100.0,
+    "gas_percentage_accuracy": 0,
+    "raw_temperature_c": 27.36,
+    "raw_humidity_pct": 39.45,
+    "raw_gas_resistance_ohm": 5684.8,
+    "stabilization_status": 13,
+    "run_in_status": 13,
+    "bsec_version": "2.6.1.0",
+    "stale": false,
+    "timestamp": 1787057327.6464982
+  },
+  "thermal": {
+    "sensor": "MLX90640",
+    "available": true,
+    "address": "0x33",
+    "resolution": "32x24",
+    "pixels": 768,
+    "serial": [
+      3339,
+      52910,
+      394
+    ],
+    "refresh_rate_hz": 4
+  },
+  "cameras": {
+    "error": "No module named 'picamera2'"
+  },
+  "system": {
+    "mem_total_mb": 8058,
+    "mem_available_mb": 6654
+  }
+}
