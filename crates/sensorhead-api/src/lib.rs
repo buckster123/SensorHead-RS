@@ -1,0 +1,296 @@
+//! HTTP face over the SensorHead contract.
+//!
+//! Hardware routes proxy to the live Python dashboard when
+//! `SENSORHEAD_UPSTREAM` is set (the BSEC2 / Picamera2 walls stay there).
+//! `/api/thermal/heatmap` is rendered in Rust from `/api/thermal/data`.
+
+use std::sync::Arc;
+
+use axum::body::Body;
+use axum::extract::{Query, State};
+use axum::http::{header, HeaderValue, StatusCode, Uri};
+use axum::response::{IntoResponse, Response};
+use axum::routing::get;
+use axum::{Json, Router};
+use sensorhead::{render_heatmap, EnvironmentBody, ThermalBody, HEATMAP_HEIGHT, HEATMAP_WIDTH};
+use serde::Deserialize;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub upstream: Option<String>,
+    pub client: reqwest::Client,
+}
+
+impl AppState {
+    pub fn new(upstream: Option<String>) -> anyhow::Result<Self> {
+        let client = reqwest::Client::builder()
+            .timeout(std::time::Duration::from_secs(8))
+            .build()?;
+        Ok(Self {
+            upstream: upstream.filter(|s| !s.is_empty()),
+            client,
+        })
+    }
+}
+
+pub fn router(state: AppState) -> Router {
+    Router::new()
+        .route("/health", get(health))
+        .route("/api/environment", get(environment))
+        .route("/api/environment/save-state", get(proxy_named))
+        .route("/api/thermal/data", get(thermal_data))
+        .route("/api/thermal/heatmap", get(thermal_heatmap))
+        .route("/api/status", get(proxy_named))
+        .route("/api/models", get(proxy_named))
+        .route("/api/capture/visual", get(proxy_named))
+        .route("/api/capture/night", get(proxy_named))
+        .route("/api/detect", get(proxy_named))
+        .route("/api/classify", get(proxy_named))
+        .route("/api/pose", get(proxy_named))
+        .fallback(proxy_fallback)
+        .with_state(Arc::new(state))
+}
+
+async fn health(State(st): State<Arc<AppState>>) -> impl IntoResponse {
+    Json(serde_json::json!({
+        "ok": true,
+        "service": "sensorhead-rs",
+        "upstream": st.upstream,
+    }))
+}
+
+async fn environment(State(st): State<Arc<AppState>>) -> Response {
+    match fetch_upstream(&st, "/api/environment").await {
+        Ok(resp) => forward(resp).await,
+        Err(reason) => Json(EnvironmentBody::unavailable(reason)).into_response(),
+    }
+}
+
+async fn thermal_data(State(st): State<Arc<AppState>>) -> Response {
+    match fetch_upstream(&st, "/api/thermal/data").await {
+        Ok(resp) => forward(resp).await,
+        Err(reason) => Json(ThermalBody::unavailable(reason)).into_response(),
+    }
+}
+
+#[derive(Deserialize)]
+struct HeatmapQuery {
+    width: Option<u32>,
+    height: Option<u32>,
+}
+
+async fn thermal_heatmap(
+    State(st): State<Arc<AppState>>,
+    Query(q): Query<HeatmapQuery>,
+) -> Response {
+    let width = q.width.unwrap_or(HEATMAP_WIDTH);
+    let height = q.height.unwrap_or(HEATMAP_HEIGHT);
+    let resp = match fetch_upstream(&st, "/api/thermal/data").await {
+        Ok(r) => r,
+        Err(reason) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": reason})),
+            )
+                .into_response();
+        }
+    };
+    let bytes = match resp.bytes().await {
+        Ok(b) => b,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response();
+        }
+    };
+    let body = match ThermalBody::parse(&bytes) {
+        Ok(b) => b,
+        Err(e) => {
+            return (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                Json(serde_json::json!({"error": e.to_string()})),
+            )
+                .into_response();
+        }
+    };
+    if body.error {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({
+                "error": body.reason.unwrap_or_else(|| "thermal unavailable".into())
+            })),
+        )
+            .into_response();
+    }
+    let Some(frame) = body.frame else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "thermal frame missing"})),
+        )
+            .into_response();
+    };
+    let Some(img) = render_heatmap(&frame, width, height) else {
+        return (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": "thermal frame too short"})),
+        )
+            .into_response();
+    };
+    match encode_jpeg(&img) {
+        Ok(jpeg) => (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, HeaderValue::from_static("image/jpeg"))],
+            jpeg,
+        )
+            .into_response(),
+        Err(e) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
+async fn proxy_named(State(st): State<Arc<AppState>>, uri: Uri) -> Response {
+    proxy_path(&st, uri.path(), uri.query()).await
+}
+
+async fn proxy_fallback(State(st): State<Arc<AppState>>, uri: Uri) -> Response {
+    proxy_path(&st, uri.path(), uri.query()).await
+}
+
+async fn proxy_path(st: &AppState, path: &str, query: Option<&str>) -> Response {
+    let suffix = match query {
+        Some(q) => format!("{path}?{q}"),
+        None => path.to_string(),
+    };
+    match fetch_upstream(st, &suffix).await {
+        Ok(resp) => forward(resp).await,
+        Err(reason) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({
+                "error": true,
+                "status": "no_upstream",
+                "reason": reason,
+            })),
+        )
+            .into_response(),
+    }
+}
+
+async fn fetch_upstream(st: &AppState, path_and_query: &str) -> Result<reqwest::Response, String> {
+    let base = st
+        .upstream
+        .as_ref()
+        .ok_or_else(|| "no upstream configured".to_string())?;
+    let url = format!("{}{path_and_query}", base.trim_end_matches('/'));
+    st.client.get(url).send().await.map_err(|e| e.to_string())
+}
+
+async fn forward(resp: reqwest::Response) -> Response {
+    let status = StatusCode::from_u16(resp.status().as_u16()).unwrap_or(StatusCode::BAD_GATEWAY);
+    let content_type = resp
+        .headers()
+        .get(reqwest::header::CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or("application/octet-stream")
+        .to_string();
+    match resp.bytes().await {
+        Ok(bytes) => {
+            let mut out = Response::new(Body::from(bytes));
+            *out.status_mut() = status;
+            if let Ok(v) = HeaderValue::from_str(&content_type) {
+                out.headers_mut().insert(header::CONTENT_TYPE, v);
+            }
+            out
+        }
+        Err(e) => (
+            StatusCode::BAD_GATEWAY,
+            Json(serde_json::json!({"error": e.to_string()})),
+        )
+            .into_response(),
+    }
+}
+
+fn encode_jpeg(img: &sensorhead::RgbImage) -> anyhow::Result<Vec<u8>> {
+    use image::{codecs::jpeg::JpegEncoder, ImageEncoder, Rgb};
+    let buffer = image::ImageBuffer::<Rgb<u8>, _>::from_raw(img.width, img.height, img.rgb.clone())
+        .ok_or_else(|| anyhow::anyhow!("ironbow buffer shape rejected by image crate"))?;
+    let mut out = Vec::new();
+    let encoder = JpegEncoder::new_with_quality(&mut out, 90);
+    encoder.write_image(
+        buffer.as_raw(),
+        img.width,
+        img.height,
+        image::ExtendedColorType::Rgb8,
+    )?;
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use axum::body::{to_bytes, Body};
+    use axum::http::Request;
+    use tower::ServiceExt;
+
+    #[tokio::test]
+    async fn health_names_this_process() {
+        let app = router(AppState::new(None).unwrap());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/health")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v["ok"], true);
+        assert_eq!(v["service"], "sensorhead-rs");
+        assert!(v["upstream"].is_null());
+    }
+
+    #[tokio::test]
+    async fn environment_without_upstream_is_unavailable_not_fake() {
+        let app = router(AppState::new(None).unwrap());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/environment")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
+        let env = EnvironmentBody::parse(&bytes).unwrap();
+        assert!(env.error);
+        assert_eq!(env.status.as_deref(), Some("unavailable"));
+        assert!(!env.apexos_air_quality_possible());
+    }
+
+    #[tokio::test]
+    async fn thermal_without_upstream_is_unavailable() {
+        let app = router(AppState::new(None).unwrap());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/thermal/data")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let bytes = to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
+        let body = ThermalBody::parse(&bytes).unwrap();
+        assert!(body.error);
+        assert!(body.frame.is_none());
+    }
+}

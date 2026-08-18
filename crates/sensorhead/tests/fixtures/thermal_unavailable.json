@@ -1,0 +1,6 @@
+{
+  "error": true,
+  "sensor": "MLX90640",
+  "status": "unavailable",
+  "reason": "Sensor not detected on I2C bus"
+}

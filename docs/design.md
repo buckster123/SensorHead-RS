@@ -7,8 +7,10 @@
 The shapes below are extracted from `py-source/` (`sensor_head/dashboard.py`,
 `hardware/environment.py`, `hardware/thermal.py`, `server.py`) and from the keys
 `ApexOS-RS/tools/crates/apex-sensor-bridge` already parses. Live captured JSON from
-apex1 is still an open P1 task — until then, treat this as the compatibility target,
-not as a byte-perfect fixture set.
+apex1 (2026-08-18) lives in `crates/sensorhead/tests/fixtures/` — BSEC body,
+32×24 thermal frame, and `/api/status`. Synthetic raw-mode / warming_up /
+thermal-unavailable fixtures cover the degrade paths that were not on the wire
+that afternoon.
 
 ## Scope
 
@@ -134,4 +136,6 @@ persisted and wins across restarts (the calibration, not the listen address).
 - Whether `/api/thermal/data` keeps serving the full 768-float frame from Rust
   (gateway depends on it) while the bridge keeps ignoring it — yes, unless ApexOS-RS
   changes; assume yes.
-- Fixture capture from apex1 (P1).
+- Whether `/api/thermal/heatmap` stays a native Rust render (current
+  `sensorhead-api` path) or must byte-match the Python JPEG. Consumers today
+  want a JPEG, not a specific encoding.

@@ -52,3 +52,20 @@
 
 - **`py-source/` is read-only and gitignored.** **Don't edit the checkout; don't
   `git add` it.**
+
+- **apex1 2026-08-18 field read.** `sensorhead-dashboard.service` is the live
+  Python unit (`/home/apex1/SensorHead/venv`, binds `0.0.0.0:8080`). I2C shows
+  BME688@0x77 + MLX90640@0x33. BSEC 2.6.1.0 **is** in that venv
+  (`bme68x-2.6.1-py3.13-linux-aarch64.egg`) and `/api/environment` returns `iaq`
+  — but `data/` has no `bsec_state.json`, so accuracy stays 0 (stabilizing) and
+  IAQ can peg at 500. `picamera2` is **not** installed; capture/detect return
+  `{"error":"No module named 'picamera2'"}`. `apex-sensor-bridge` is inactive
+  and has no `SENSORHEAD_URL`. **Don't assume the ApexOS-RS "raw-mode, no BSEC"
+  note is still the live truth — probe `/api/environment`. Don't treat accuracy-0
+  IAQ as a calibrated nose.**
+
+- **`/api/environment/save-state` can lie.** Same afternoon it returned
+  `{status: skipped, reason: BSEC not active}` while `/api/environment` was
+  returning a full BSEC body. Lazy-init / instance-state bug in the Python
+  original. **Don't use save-state as the BSEC-alive probe; read the environment
+  body.**

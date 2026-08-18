@@ -27,6 +27,7 @@ can honestly go, and **links** only where a vendor stack forces C/C++ or Python.
 ```
 crates/
   sensorhead/         # core lib — types, parsers, ironbow, degrade rules
+  sensorhead-api/     # axum HTTP face — drop-in :8080; walls via SENSORHEAD_UPSTREAM
 docs/design.md        # THE contract — HTTP + MCP, pinned from the Python original
 docs/upstream.md      # py-source checkout + the two FFI walls
 docs/CHARTER.md       # binding decisions
@@ -131,6 +132,8 @@ ideas, salience 0.8–0.95) · `episode_*` (multi-step sequences).
 cargo test --workspace
 cargo fmt --all && cargo clippy --workspace -- -D warnings   # clippy-zero policy
 cargo build --release --workspace
+# Drop-in face in front of the live Python dashboard (laptop → apex1):
+cargo run -p sensorhead-api -- --bind 127.0.0.1:18080 --upstream http://192.168.0.158:8080
 # Refresh the Python original (gitignored nested checkout):
 git -C py-source pull --ff-only
 ```
@@ -167,6 +170,7 @@ Load only the relevant doc when entering a subsystem — do not load all of them
 | `docs/upstream.md` | py-source checkout, BSEC2 + libcamera walls, what can be native Rust |
 | `docs/gotchas.md` | **Any subsystem change — grep it first** |
 | `BACKLOG.md` | Outstanding work — slice ledger + parked items |
+| `crates/sensorhead-api` | HTTP drop-in — load when changing routes or the upstream proxy |
 
 ---
 
