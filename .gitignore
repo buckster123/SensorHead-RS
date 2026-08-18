@@ -4,3 +4,6 @@
 
 # Nested checkout of buckster123/SensorHead — see docs/upstream.md
 py-source/
+
+# Prefrontal notes auto-commit locally and must not ride a feature branch
+notes/

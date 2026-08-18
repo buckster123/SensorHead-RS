@@ -51,7 +51,7 @@
 - **BSEC full calibration is ~48 hours; save `bsec_state.json`.** Accuracy 0→3.
   Compensated temperature runs ~3–5 °C below raw (heater). CO₂eq is VOC-derived, not a
   NDIR CO₂ reading. **Don't compare raw BME temp to a room thermometer and call the
-  sensor wrong; don't advertise CO₂eq as real CO₂.**
+  sensor wrong; don't advertise CO₂eq as real CO₂. Don't invent a state file.**
 
 - **IMX500 still capture and inference are exclusive.** Dashboard returns 409
   `{ai_active: true}` when the AI engine holds CAM0. **Don't return a black JPEG.**
@@ -67,8 +67,9 @@
 - **apex1 2026-08-18 field read.** `sensorhead-dashboard.service` is the live
   Python unit (`/home/apex1/SensorHead/venv`, binds `0.0.0.0:8080`). I2C shows
   BME688@0x77 + MLX90640@0x33. BSEC 2.6.1.0 **is** in that venv
-  (`bme68x-2.6.1-py3.13-linux-aarch64.egg`) and `/api/environment` returns `iaq`
-  — but `data/` has no `bsec_state.json`, so accuracy stays 0 (stabilizing).
+  (`bme68x-2.6.1-py3.13-linux-aarch64.egg`) and `/api/environment` returns
+  `iaq`. Accuracy is still 0 (stabilizing) — that is honest, not a missing
+  file.
   Cameras: CAM0 `imx708_wide_noir`, CAM1 `imx500`. After apt
   `python3-picamera2` + flipping the venv to system site-packages,
   `/api/status` reports both, and `/api/capture/visual` + `/night` return
@@ -82,8 +83,15 @@
   `/api/environment`. Don't treat accuracy-0 IAQ as a calibrated nose.
   Don't treat an empty detect body as "picamera2 is missing".**
 
-- **`/api/environment/save-state` can lie.** Same afternoon it returned
-  `{status: skipped, reason: BSEC not active}` while `/api/environment` was
-  returning a full BSEC body. Lazy-init / instance-state bug in the Python
-  original. **Don't use save-state as the BSEC-alive probe; read the environment
-  body.**
+- **`data_dir` was `/home/hailo/...`, not a BSEC-dead process.** Journal on
+  apex1 (2026-08-17 → 18): `Failed to save BSEC state: [Errno 13] Permission
+  denied: '/home/hailo'` every five minutes while `/api/environment` returned a
+  full BSEC 2.6.1.0 body. `save-state` mapped any `False` to
+  `{reason: BSEC not active}`. Fixed upstream in
+  `buckster123/SensorHead` #2: `data_dir` is `<repo>/data` or
+  `SENSORHEAD_DATA_DIR`; skip reasons are real; save-state lazy-inits.
+  Live on apex1 the same day: `/home/apex1/SensorHead/data/bsec_state.json`
+  (238-byte `state`, version 2.6.1.0); restart logs
+  `Restored BSEC state`. Accuracy stays 0 until the ~48 h run. **Don't
+  create `/home/hailo` to paper over the path. Don't treat a skipped
+  save-state as "BSEC is off" — read `/api/environment` and the journal.**
