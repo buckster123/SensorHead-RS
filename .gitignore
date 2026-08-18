@@ -1,0 +1,6 @@
+/target
+*.swp
+.env
+
+# Nested checkout of buckster123/SensorHead — see docs/upstream.md
+py-source/
