@@ -32,10 +32,13 @@ pass (house doctrine #5). Notes carry the date and the evidence.
 
 ## Post-v1 parking
 
-- [ ] **S5 — BSEC stdio helper** (gated): `walls/bsec.py` +
+- [x] **S5 — BSEC stdio helper** (gated, 2026-08-18): `walls/bsec.py` +
       `SENSORHEAD_IAQ=helper` on system Python. Default stays `upstream`.
-      `--doctor` checks the import, never fetches the egg. Tick after the
-      exclusive apex1 probe.
+      `--doctor` on apex1: `ok` with `/usr/bin/python3` + leftover venv egg;
+      without egg, `No module named bme68x`. Exclusive `:18081` probe:
+      restored 238-byte state, `/api/environment` `source=helper`
+      BSEC 2.6.1.0 iaq 0.0 accuracy 1, save-state wrote the live
+      `bsec_state.json`. Public unit left on `upstream`.
 - Picamera2 / libcamera stdio helper (same D9 shape as BSEC)
 - `bindgen` to BSEC C (after the helper is the live nose)
 - Native MLX90640 I2C (gated; default stays `upstream` until Python

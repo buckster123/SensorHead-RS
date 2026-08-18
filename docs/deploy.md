@@ -63,6 +63,12 @@ curl -sS http://127.0.0.1:18081/api/environment
 sudo systemctl start sensorhead-dashboard
 ```
 
+**Live on apex1 (2026-08-18):** doctor `ok` on `/usr/bin/python3` + the
+leftover venv egg (no venv interpreter). Exclusive `:18081` helper
+restored the 238-byte state, returned `source=helper` BSEC 2.6.1.0
+(iaq 0.0, accuracy 1), and saved the live state file. Public unit
+stayed `SENSORHEAD_IAQ=upstream`.
+
 ## Cameras (Python wall on the Pi)
 
 Still capture and IMX500 inference stay in the Python dashboard. On
