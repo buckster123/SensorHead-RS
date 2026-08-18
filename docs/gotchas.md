@@ -22,6 +22,17 @@
   on-chip detect/classify/pose go through `picamera2` (`devices.imx500.IMX500`).
   **Don't promise a pure-Rust IMX500 path without a proven libcamera client.**
 
+- **Picamera2 on the Pi is apt, not pip.** The live stack is
+  `python3-picamera2` + `python3-libcamera` from `archive.raspberrypi.com`
+  (apex1 2026-08-18: 0.3.37 + libcamera 0.7.2). The SensorHead venv ships
+  isolated (`include-system-site-packages = false`), so apt modules are
+  invisible until that flag is flipped (or the venv is recreated with
+  `--system-site-packages`). Venv site-packages still win, so the BSEC
+  egg stays. IMX500 on-chip models live in `imx500-models` /
+  `imx500-firmware` under `/usr/share/imx500-models`. **Don't
+  `pip install picamera2` — that wheel cannot talk to the Pi libcamera
+  stack. Don't recreate the venv just to see apt packages.**
+
 - **This service owns the devices; ApexOS-RS only HTTP-polls.**
   `apex-sensor-bridge` is `PrivateDevices=true` on purpose. **Don't open `/dev/i2c-*`
   or CSI from an ApexOS-RS crate "to simplify".**
@@ -57,12 +68,19 @@
   Python unit (`/home/apex1/SensorHead/venv`, binds `0.0.0.0:8080`). I2C shows
   BME688@0x77 + MLX90640@0x33. BSEC 2.6.1.0 **is** in that venv
   (`bme68x-2.6.1-py3.13-linux-aarch64.egg`) and `/api/environment` returns `iaq`
-  — but `data/` has no `bsec_state.json`, so accuracy stays 0 (stabilizing) and
-  IAQ can peg at 500. `picamera2` is **not** installed; capture/detect return
-  `{"error":"No module named 'picamera2'"}`. `apex-sensor-bridge` is inactive
-  and has no `SENSORHEAD_URL`. **Don't assume the ApexOS-RS "raw-mode, no BSEC"
-  note is still the live truth — probe `/api/environment`. Don't treat accuracy-0
-  IAQ as a calibrated nose.**
+  — but `data/` has no `bsec_state.json`, so accuracy stays 0 (stabilizing).
+  Cameras: CAM0 `imx708_wide_noir`, CAM1 `imx500`. After apt
+  `python3-picamera2` + flipping the venv to system site-packages,
+  `/api/status` reports both, and `/api/capture/visual` + `/night` return
+  JPEGs on `:8080` and the Rust sidecar `:18080`. `/api/models` lists every
+  bundled `.rpk` as installed. `/api/detect` reaches the IMX500 path
+  (EfficientDet load ~5 s) and returns the original's
+  `{"detections":[],"error":"No inference output"}` — firmware just
+  landed; 5 s warmup + 4 s poll may be short. `apex-sensor-bridge` is
+  inactive and has no `SENSORHEAD_URL`. **Don't assume the ApexOS-RS
+  "raw-mode, no BSEC" note is still the live truth — probe
+  `/api/environment`. Don't treat accuracy-0 IAQ as a calibrated nose.
+  Don't treat an empty detect body as "picamera2 is missing".**
 
 - **`/api/environment/save-state` can lie.** Same afternoon it returned
   `{status: skipped, reason: BSEC not active}` while `/api/environment` was

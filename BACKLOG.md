@@ -15,10 +15,12 @@ pass (house doctrine #5). Notes carry the date and the evidence.
 - [x] **S3 — HTTP face**: `sensorhead-api` drop-in. Merged #1 + #2.
       **Live on apex1 2026-08-18:** `sensorhead-api.service` active,
       `127.0.0.1:18080` → Python `:8080`. `/health` `git_sha=b2efe29`.
-      `/api/status` envelope `SensorHead-RS` + I2C 0x33/0x77 + honest
-      `picamera2` camera error. `/api/environment` BSEC keys present
-      (IAQ 500 / accuracy 0 — no `bsec_state.json`). `/api/thermal/data`
-      768 floats. Native ironbow JPEG 200. Python still owns `:8080`.
+      `/api/status` envelope `SensorHead-RS` + I2C 0x33/0x77. Same-day
+      follow-up: apt `python3-picamera2` + venv system-site-packages;
+      both CSI cameras live; visual/night JPEGs on `:8080` and `:18080`.
+      `/api/environment` BSEC keys present (accuracy 0 — no
+      `bsec_state.json`). `/api/thermal/data` 768 floats. Native ironbow
+      JPEG 200. Python still owns `:8080`.
 - [ ] **S4 — field cutover**: Rust on `:8080`, `SENSORHEAD_URL` on
       `apex-sensor-bridge`, bridge emits AirQuality + ThermalFrame.
 
