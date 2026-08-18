@@ -6,28 +6,21 @@ pass (house doctrine #5). Notes carry the date and the evidence.
 ## v1 (native head, same wire)
 
 - [x] **S0 — bootstrap**: launchpad stamp, `docs/design.md`, `docs/upstream.md`, workspace.
-      `py-source/` cloned from `buckster123/SensorHead` (local, gitignored).
-      Root commit `9f69e52` on `main` (2026-08-18). No GitHub remote yet.
-- [ ] **S1 — fixtures + types**: parse `/api/environment` (BSEC + raw + warming_up) and
-      `/api/thermal/data` from captured JSON. Unit tests, no hardware.
-      *Evidence 2026-08-18 (laptop, not merged):* live apex1 capture in
-      `crates/sensorhead/tests/fixtures/`; 7 fixture tests + 7 lib tests green.
-- [ ] **S2 — pure views**: IAQ bands, ironbow LUT, thermal min/max/mean, degrade mappers.
-      *Evidence 2026-08-18:* bands/accuracy/clamp/stats/LUT unit-tested; heatmap
-      320×240 from a 32×24 frame.
-- [ ] **S3 — HTTP face**: axum daemon that can stand in for `:8080` for the two ApexOS-RS
-      poll routes; BSEC/cameras may still be sidecars.
-      *Evidence 2026-08-18 (laptop → live apex1, not a cutover):*
-      `sensorhead-api --bind 127.0.0.1:18080 --upstream http://192.168.0.158:8080`
-      served `/api/environment` (BSEC 2.6.1.0 keys present), `/api/thermal/data`
-      (768 floats), and a native-ironbow `/api/thermal/heatmap` JPEG.
-      Python still owns apex1 `:8080`.
-      `deploy/sensorhead-api.service` sits on loopback `:18080` so a Pi
-      install cannot clobber the live dashboard.
-      `/health` reports `version` + `git_sha`; `/api/status` is composed
-      (Rust envelope, upstream nests, honest camera error).
-- [ ] **S4 — field**: `SENSORHEAD_URL` on apex1 pointed at the Rust daemon; bridge still
-      emits AirQuality + ThermalFrame; evidence recorded here.
+      Public at https://github.com/buckster123/SensorHead-RS (2026-08-18).
+- [x] **S1 — fixtures + types**: parse `/api/environment` (BSEC + raw + warming_up) and
+      `/api/thermal/data` from captured JSON. Merged in #1. Live apex1 fixtures in
+      `crates/sensorhead/tests/fixtures/`.
+- [x] **S2 — pure views**: IAQ bands, ironbow LUT, thermal min/max/mean, degrade mappers.
+      Merged in #1; native heatmap JPEG served from the apex1 sidecar (below).
+- [x] **S3 — HTTP face**: `sensorhead-api` drop-in. Merged #1 + #2.
+      **Live on apex1 2026-08-18:** `sensorhead-api.service` active,
+      `127.0.0.1:18080` → Python `:8080`. `/health` `git_sha=b2efe29`.
+      `/api/status` envelope `SensorHead-RS` + I2C 0x33/0x77 + honest
+      `picamera2` camera error. `/api/environment` BSEC keys present
+      (IAQ 500 / accuracy 0 — no `bsec_state.json`). `/api/thermal/data`
+      768 floats. Native ironbow JPEG 200. Python still owns `:8080`.
+- [ ] **S4 — field cutover**: Rust on `:8080`, `SENSORHEAD_URL` on
+      `apex-sensor-bridge`, bridge emits AirQuality + ThermalFrame.
 
 ## Post-v1 parking
 

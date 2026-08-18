@@ -22,6 +22,10 @@ curl -s http://127.0.0.1:18080/health
 curl -s http://127.0.0.1:18080/api/environment
 ```
 
+**Live on apex1 (2026-08-18):** unit `sensorhead-api.service` is enabled,
+binary at `/usr/local/bin/sensorhead-api`, checkout `~/SensorHead-RS`
+(`b2efe29`). Python still owns `:8080`.
+
 Optional knobs in `/etc/sensorhead/env` (`0600`, root-owned):
 
 ```
