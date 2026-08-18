@@ -59,10 +59,12 @@ T/RH/P/gas; it just will not emit an `AirQuality` event.
 What this means for Rust:
 
 - Native I2C to the BME688 can own **raw** channels.
-- **IAQ intelligence** means linking Bosch's C (bindgen / cc) *or* talking to a
-  tiny Python/`bme68x` sidecar that already has the licensed blob.
+- **IAQ intelligence** is the in-repo stdio helper `walls/bsec.py` (charter D9)
+  talking to the licensed blob, or a later `bindgen` to Bosch C.
 - We do not vendor that blob (charter D6).
 - We do not invent a substitute IAQ (charter D5).
+- We do not fetch the SDK (`sensorhead-api --doctor` only checks the import).
+  Operator path: `docs/bsec-sdk.md`.
 
 ### 2. libcamera + Picamera2 — the eyes
 

@@ -43,8 +43,9 @@ cargo build --release --workspace
 
 ## Use
 
-The live head on apex1 is still the Python dashboard on `:8080`. This binary is the
-drop-in face — it proxies the vendor walls and renders the thermal heatmap itself:
+Thin S4 on apex1: this binary owns `:8080` and proxies the Python wall on `:8081`.
+`SENSORHEAD_IAQ=helper` (gated) reads BSEC via `walls/bsec.py` on system Python
+instead of that dashboard — exclusive, see `docs/bsec-sdk.md`. Laptop drop-in:
 
 ```sh
 cargo run -p sensorhead-api -- --bind 127.0.0.1:18080 --upstream http://192.168.0.158:8080
@@ -52,9 +53,7 @@ curl -s http://127.0.0.1:18080/health
 curl -s http://127.0.0.1:18080/api/environment
 ```
 
-On a sensor node, stop the Python unit and bind `0.0.0.0:8080` with
-`SENSORHEAD_UPSTREAM` pointed at the Python process on a side port. Do not steal
-`:8080` from a running dashboard by accident — the default bind is loopback.
+Default bind is loopback so a laptop run cannot steal a live `:8080`.
 
 ## How it works
 

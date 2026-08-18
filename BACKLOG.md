@@ -32,7 +32,15 @@ pass (house doctrine #5). Notes carry the date and the evidence.
 
 ## Post-v1 parking
 
-- Picamera2 / libcamera sidecar shape (stdio vs localhost vs bindgen)
+- [x] **S5 — BSEC stdio helper** (gated, 2026-08-18): `walls/bsec.py` +
+      `SENSORHEAD_IAQ=helper` on system Python. Default stays `upstream`.
+      `--doctor` on apex1: `ok` with `/usr/bin/python3` + leftover venv egg;
+      without egg, `No module named bme68x`. Exclusive `:18081` probe:
+      restored 238-byte state, `/api/environment` `source=helper`
+      BSEC 2.6.1.0 iaq 0.0 accuracy 1, save-state wrote the live
+      `bsec_state.json`. Public unit left on `upstream`.
+- Picamera2 / libcamera stdio helper (same D9 shape as BSEC)
+- `bindgen` to BSEC C (after the helper is the live nose)
 - Native MLX90640 I2C (gated; default stays `upstream` until Python
       stops opening 0x33 and the unit gets `DeviceAllow=/dev/i2c-1`).
       **apex1 2026-08-18 exclusive probe:** dashboard stopped, `SENSORHEAD_THERMAL=native`

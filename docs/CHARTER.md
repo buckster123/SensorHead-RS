@@ -59,6 +59,14 @@ rationale is lost gets re-litigated within a month.
   rule here on 2026-08-18: one branch, one slice, then commit → push → merge →
   next, as long as `cargo test --workspace` and `clippy -- -D warnings` are
   green. Still no force-push. Still no commit directly to `main`.
+- **D9 — FFI walls are in-repo stdio helpers on system Python.** No venv.
+  `walls/bsec.py` (and later a Picamera2 helper) speak newline JSON on stdio.
+  The operator supplies the BSEC egg at `SENSORHEAD_BME68X_EGG`; this tree
+  never vendors it. `sensorhead-api --doctor` checks the import and does
+  **not** fetch Bosch's SDK. `bindgen` to BSEC C is a later exclusive step
+  for IAQ, not a second architecture. Default `SENSORHEAD_IAQ` stays
+  `upstream` until an exclusive cutover. Rules out recreating a "small venv"
+  for hygiene, and rules out an installer that downloads the blob.
 
 ## Phases
 
@@ -95,6 +103,9 @@ Each with the reason, so a future reader knows it was a decision and not an over
 
 - FFI shape for the two walls: long-lived Python sidecar, `bindgen` to BSEC C, or
   subprocess to a thin `bme68x` helper? Same question for Picamera2.
+  **Answered 2026-08-18 (D9):** in-repo stdio helpers on `/usr/bin/python3`.
+  BSEC helper is `walls/bsec.py` behind `SENSORHEAD_IAQ=helper`. Picamera2
+  helper is the next wall. `bindgen` later for IAQ only.
 - Does MLX90640 go native Rust in P3 (`embedded-hal` / `i2cdev`) or stay behind the
   same sidecar as BSEC for one I2C owner? **Answered 2026-08-18:** native exists,
   gated (`SENSORHEAD_THERMAL=native`). Default stays `upstream` while Python
@@ -117,3 +128,5 @@ Dated entries. A decision changes here first, then in the code.
   Default remains the Python sidecar so there is one I2C owner. S4 thin
   (same day) put Rust on public `:8080` with `thermal=upstream`; native
   I2C and `DeviceAllow` stay a later exclusive step.
+- **2026-08-18** — D9 adopted. André: thin stdio helpers in this repo, system
+  Python, no venv, doctor-not-fetch, bindgen later for IAQ.

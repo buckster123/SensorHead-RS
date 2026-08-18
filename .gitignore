@@ -1,6 +1,8 @@
 /target
 *.swp
 .env
+__pycache__/
+*.pyc
 
 # Nested checkout of buckster123/SensorHead — see docs/upstream.md
 py-source/

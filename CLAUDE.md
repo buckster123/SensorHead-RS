@@ -141,7 +141,8 @@ git -C py-source pull --ff-only
 ```
 
 Pi + systemd + env-file pattern: `~/Projects/Launchpad-RS/docs/deploy.md`.
-The live Python unit on apex1 is the field truth until this repo replaces it.
+Thin S4 on apex1: Rust owns `:8080`, Python is the `:8081` wall. `SENSORHEAD_IAQ`
+stays `upstream` until an exclusive helper cutover.
 
 ---
 
@@ -174,6 +175,7 @@ Load only the relevant doc when entering a subsystem — do not load all of them
 | `BACKLOG.md` | Outstanding work — slice ledger + parked items |
 | `crates/sensorhead-api` | HTTP drop-in — load when changing routes or the upstream proxy |
 | `docs/deploy.md` | Pi install + thin S4 (`:8080` Rust, `:8081` Python wall) |
+| `docs/bsec-sdk.md` | Operator BSEC egg path — doctor checks, never fetches |
 
 ---
 

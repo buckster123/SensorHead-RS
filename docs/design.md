@@ -27,7 +27,7 @@ ApexOS-RS sets `SENSORHEAD_URL`.
 
 | Endpoint | Purpose | Shape |
 |---|---|---|
-| `GET /health` | This process | `{ok, service: sensorhead-rs, version, git_sha, upstream}` |
+| `GET /health` | This process | `{ok, service: sensorhead-rs, version, git_sha, upstream, thermal, iaq}` |
 | `GET /api/status` | Health + which senses answered | Envelope is Rust (`server: SensorHead-RS`, `frontend`, `git_sha`). Nested `environment` / `thermal` / `cameras` / `i2c_devices` / `system` are copied from the Python upstream when it answers — including an honest camera error. Missing or failed upstream → those nests are unavailable/error, never a fake IAQ |
 | `GET /api/environment` | BME688 (+ BSEC2 when active) | JSON — see Types. ApexOS-RS reads `temperature_c`, `humidity_pct`, `pressure_hpa`, `iaq`, `co2_equivalent_ppm`, `breath_voc_ppm`, `iaq_accuracy`. If `error` is true, the bridge emits nothing |
 | `GET /api/environment/save-state` | Persist BSEC calibration blob | `{status: saved\|skipped, …}` |
@@ -110,6 +110,11 @@ reason.
 | `SENSORHEAD_BIND` | `127.0.0.1:8080` | HTTP listen (proposed; Python today is `--port`) |
 | `SENSORHEAD_DATA_DIR` | platform data dir | BSEC state + logs. ApexOS already uses this name for the Python unit |
 | `SENSORHEAD_THERMAL` | `upstream` | `upstream` proxies Python `/api/thermal/*`. `native` opens the MLX90640 on I2C (`SENSORHEAD_I2C_BUS`, `SENSORHEAD_MLX_ADDR`). Exclusive — do not combine with a live Python thermal owner. A typo is a startup error, not a silent proxy |
+| `SENSORHEAD_IAQ` | `upstream` | `upstream` proxies Python `/api/environment`. `helper` spawns `walls/bsec.py` on system Python + `SENSORHEAD_BME68X_EGG`. Exclusive on the BME688. A typo is a startup error |
+| `SENSORHEAD_BSEC_HELPER` | `walls/bsec.py` | Path to the BSEC stdio helper |
+| `SENSORHEAD_PYTHON` | `/usr/bin/python3` | Interpreter for helpers. Never a venv |
+| `SENSORHEAD_BME68X_EGG` | unset | Operator-supplied pi3g egg (not in git) |
+| `SENSORHEAD_BME688_ADDR` | `0x77` | BME688 address for the helper |
 | `SENSORHEAD_URL` | unset | **Consumer** knob on ApexOS-RS, not this process |
 
 Seed-only until a config file earns its keep. BSEC state on disk **is**
@@ -138,6 +143,7 @@ persisted and wins across restarts (the calibration, not the listen address).
 ## Open questions
 
 - Exact listen/env names once the Rust binary exists (`--port` vs `SENSORHEAD_BIND`).
+  **Answered:** `SENSORHEAD_BIND`, plus the IAQ/thermal source knobs above.
 - Whether `/api/thermal/data` keeps serving the full 768-float frame from Rust
   (gateway depends on it) while the bridge keeps ignoring it — yes, unless ApexOS-RS
   changes; assume yes.
