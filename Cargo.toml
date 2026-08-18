@@ -10,6 +10,7 @@ repository = "https://github.com/buckster123/SensorHead-RS"
 [workspace.dependencies]
 anyhow = "1"
 axum = "0.8"
+base64 = "0.22"
 clap = { version = "4", features = ["derive", "env"] }
 image = { version = "0.25", default-features = false, features = ["jpeg"] }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }

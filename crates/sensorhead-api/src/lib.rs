@@ -3,10 +3,12 @@
 //! Hardware routes proxy to the live Python dashboard when
 //! `SENSORHEAD_UPSTREAM` is set (Picamera2 and, by default, BSEC stay there).
 //! `SENSORHEAD_IAQ=helper` reads BSEC via `walls/bsec.py` on system Python.
+//! `SENSORHEAD_CAMERAS=helper` reads Picamera2 via `walls/cameras.py`.
 //! `/api/thermal/heatmap` is rendered in Rust from `/api/thermal/data`.
 //! Thermal frames come from upstream unless `SENSORHEAD_THERMAL=native`.
 
 mod bsec_wall;
+mod cameras_wall;
 
 use std::sync::{Arc, Mutex};
 
@@ -17,19 +19,22 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
 use sensorhead::{
-    compose_status, render_heatmap, EnvironmentBody, IaqSource, NativeMlx, ThermalBody,
-    ThermalSource, UpstreamView, HEATMAP_HEIGHT, HEATMAP_WIDTH,
+    compose_status, render_heatmap, CameraSource, EnvironmentBody, IaqSource, NativeMlx,
+    ThermalBody, ThermalSource, UpstreamView, HEATMAP_HEIGHT, HEATMAP_WIDTH,
 };
 use serde::Deserialize;
 
 pub use bsec_wall::{doctor, BsecHelperConfig, DoctorReport};
+pub use cameras_wall::{doctor_cameras, CameraDoctorReport, CameraHelperConfig};
 
 pub struct AppState {
     pub upstream: Option<String>,
     pub thermal: ThermalSource,
     pub iaq: IaqSource,
+    pub cameras: CameraSource,
     pub mlx: Mutex<NativeMlx>,
     pub bsec: tokio::sync::Mutex<bsec_wall::BsecWall>,
+    pub cam: tokio::sync::Mutex<cameras_wall::CameraWall>,
     pub client: reqwest::Client,
 }
 
@@ -53,6 +58,24 @@ impl AppState {
         iaq: IaqSource,
         bsec: BsecHelperConfig,
     ) -> anyhow::Result<Self> {
+        Self::with_all(
+            upstream,
+            thermal,
+            iaq,
+            bsec,
+            CameraSource::Upstream,
+            CameraHelperConfig::default(),
+        )
+    }
+
+    pub fn with_all(
+        upstream: Option<String>,
+        thermal: ThermalSource,
+        iaq: IaqSource,
+        bsec: BsecHelperConfig,
+        cameras: CameraSource,
+        cam: CameraHelperConfig,
+    ) -> anyhow::Result<Self> {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(8))
             .build()?;
@@ -60,8 +83,10 @@ impl AppState {
             upstream: upstream.filter(|s| !s.is_empty()),
             thermal,
             iaq,
+            cameras,
             mlx: Mutex::new(NativeMlx::new()),
             bsec: tokio::sync::Mutex::new(bsec_wall::BsecWall::new(bsec)),
+            cam: tokio::sync::Mutex::new(cameras_wall::CameraWall::new(cam)),
             client,
         })
     }
@@ -75,12 +100,12 @@ pub fn router(state: AppState) -> Router {
         .route("/api/thermal/data", get(thermal_data))
         .route("/api/thermal/heatmap", get(thermal_heatmap))
         .route("/api/status", get(status))
-        .route("/api/models", get(proxy_named))
-        .route("/api/capture/visual", get(proxy_named))
-        .route("/api/capture/night", get(proxy_named))
-        .route("/api/detect", get(proxy_named))
-        .route("/api/classify", get(proxy_named))
-        .route("/api/pose", get(proxy_named))
+        .route("/api/models", get(models))
+        .route("/api/capture/visual", get(capture_visual))
+        .route("/api/capture/night", get(capture_night))
+        .route("/api/detect", get(detect))
+        .route("/api/classify", get(classify))
+        .route("/api/pose", get(pose))
         .fallback(proxy_fallback)
         .with_state(Arc::new(state))
 }
@@ -105,6 +130,7 @@ async fn health(State(st): State<Arc<AppState>>) -> impl IntoResponse {
         "upstream": st.upstream,
         "thermal": st.thermal.as_str(),
         "iaq": st.iaq.as_str(),
+        "cameras": st.cameras.as_str(),
     }))
 }
 
@@ -148,6 +174,13 @@ async fn status(State(st): State<Arc<AppState>>) -> impl IntoResponse {
             body["environment"] = v;
         }
     }
+    if st.cameras == CameraSource::Helper {
+        let cams = {
+            let mut wall = st.cam.lock().await;
+            wall.status().await
+        };
+        body["cameras"] = cams;
+    }
     Json(body)
 }
 
@@ -177,6 +210,124 @@ async fn save_state(State(st): State<Arc<AppState>>, uri: Uri) -> Response {
             Json(body).into_response()
         }
         IaqSource::Upstream => proxy_path(&st, uri.path(), uri.query()).await,
+    }
+}
+
+fn helper_jpeg_response(body: serde_json::Value) -> Response {
+    if body.get("ai_active").and_then(|v| v.as_bool()) == Some(true) {
+        return (StatusCode::CONFLICT, Json(body)).into_response();
+    }
+    if body.get("error").and_then(|v| v.as_bool()) == Some(true) {
+        return (StatusCode::INTERNAL_SERVER_ERROR, Json(body)).into_response();
+    }
+    match cameras_wall::jpeg_from_helper(&body) {
+        Ok(jpeg) => (
+            StatusCode::OK,
+            [(header::CONTENT_TYPE, HeaderValue::from_static("image/jpeg"))],
+            jpeg,
+        )
+            .into_response(),
+        Err(reason) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(serde_json::json!({"error": true, "reason": reason, "source": "helper"})),
+        )
+            .into_response(),
+    }
+}
+
+async fn capture_visual(State(st): State<Arc<AppState>>, uri: Uri) -> Response {
+    match st.cameras {
+        CameraSource::Helper => {
+            let body = {
+                let mut wall = st.cam.lock().await;
+                wall.capture("visual").await
+            };
+            helper_jpeg_response(body)
+        }
+        CameraSource::Upstream => proxy_path(&st, uri.path(), uri.query()).await,
+    }
+}
+
+async fn capture_night(State(st): State<Arc<AppState>>, uri: Uri) -> Response {
+    match st.cameras {
+        CameraSource::Helper => {
+            let body = {
+                let mut wall = st.cam.lock().await;
+                wall.capture("night").await
+            };
+            helper_jpeg_response(body)
+        }
+        CameraSource::Upstream => proxy_path(&st, uri.path(), uri.query()).await,
+    }
+}
+
+#[derive(Deserialize)]
+struct DetectQuery {
+    confidence: Option<f64>,
+}
+
+#[derive(Deserialize)]
+struct ClassifyQuery {
+    top_k: Option<u32>,
+}
+
+async fn detect(
+    State(st): State<Arc<AppState>>,
+    uri: Uri,
+    Query(q): Query<DetectQuery>,
+) -> Response {
+    match st.cameras {
+        CameraSource::Helper => {
+            let body = {
+                let mut wall = st.cam.lock().await;
+                wall.detect(q.confidence.unwrap_or(0.3)).await
+            };
+            Json(body).into_response()
+        }
+        CameraSource::Upstream => proxy_path(&st, uri.path(), uri.query()).await,
+    }
+}
+
+async fn classify(
+    State(st): State<Arc<AppState>>,
+    uri: Uri,
+    Query(q): Query<ClassifyQuery>,
+) -> Response {
+    match st.cameras {
+        CameraSource::Helper => {
+            let body = {
+                let mut wall = st.cam.lock().await;
+                wall.classify(q.top_k.unwrap_or(5)).await
+            };
+            Json(body).into_response()
+        }
+        CameraSource::Upstream => proxy_path(&st, uri.path(), uri.query()).await,
+    }
+}
+
+async fn pose(State(st): State<Arc<AppState>>, uri: Uri) -> Response {
+    match st.cameras {
+        CameraSource::Helper => {
+            let body = {
+                let mut wall = st.cam.lock().await;
+                wall.pose().await
+            };
+            Json(body).into_response()
+        }
+        CameraSource::Upstream => proxy_path(&st, uri.path(), uri.query()).await,
+    }
+}
+
+async fn models(State(st): State<Arc<AppState>>, uri: Uri) -> Response {
+    match st.cameras {
+        CameraSource::Helper => {
+            let body = {
+                let mut wall = st.cam.lock().await;
+                wall.models().await
+            };
+            Json(body).into_response()
+        }
+        CameraSource::Upstream => proxy_path(&st, uri.path(), uri.query()).await,
     }
 }
 
@@ -293,10 +444,6 @@ fn heatmap_from_body(body: ThermalBody, width: u32, height: u32) -> Response {
     }
 }
 
-async fn proxy_named(State(st): State<Arc<AppState>>, uri: Uri) -> Response {
-    proxy_path(&st, uri.path(), uri.query()).await
-}
-
 async fn proxy_fallback(State(st): State<Arc<AppState>>, uri: Uri) -> Response {
     proxy_path(&st, uri.path(), uri.query()).await
 }
@@ -398,6 +545,7 @@ mod tests {
         assert!(v["upstream"].is_null());
         assert_eq!(v["thermal"], "upstream");
         assert_eq!(v["iaq"], "upstream");
+        assert_eq!(v["cameras"], "upstream");
     }
 
     fn repo_bsec_cfg() -> BsecHelperConfig {
@@ -438,6 +586,49 @@ mod tests {
         let reason = env.reason.unwrap_or_default();
         assert!(
             reason.contains("bme68x") || reason.contains("not importable"),
+            "{reason}"
+        );
+    }
+
+    fn repo_cam_cfg() -> CameraHelperConfig {
+        CameraHelperConfig {
+            python: std::path::PathBuf::from("python3"),
+            script: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../walls/cameras.py"),
+            ..CameraHelperConfig::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn helper_cameras_without_picamera2_is_honest() {
+        let app = router(
+            AppState::with_all(
+                None,
+                ThermalSource::Upstream,
+                IaqSource::Upstream,
+                BsecHelperConfig::default(),
+                CameraSource::Helper,
+                repo_cam_cfg(),
+            )
+            .unwrap(),
+        );
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/capture/visual")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::INTERNAL_SERVER_ERROR);
+        let bytes = to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v["error"], true);
+        assert!(v.get("jpeg_b64").is_none());
+        let reason = v["reason"].as_str().unwrap_or_default();
+        assert!(
+            reason.contains("picamera2") || reason.contains("not importable"),
             "{reason}"
         );
     }

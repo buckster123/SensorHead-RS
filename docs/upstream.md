@@ -80,10 +80,10 @@ see `/usr/lib/python3/dist-packages` (see `docs/gotchas.md` / `docs/deploy.md`).
 
 What this means for Rust:
 
-- Still capture and inference stay behind a Picamera2 sidecar (or a future
-  libcamera C++ shim) until someone proves a Rust libcamera client for IMX500.
-- The HTTP/MCP faces can still be Rust: they already treat the cameras as
-  "give me a JPEG / JSON" over localhost.
+- Still capture and inference stay behind `walls/cameras.py` (charter D9)
+  until someone proves a Rust libcamera client for IMX500.
+- The HTTP face treats the cameras as "give me a JPEG / JSON" over stdio
+  (`jpeg_b64`) or the Python upstream. See `docs/picamera2.md`.
 
 ### What is *not* a wall
 

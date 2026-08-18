@@ -44,15 +44,21 @@
   `SENSORHEAD_UPSTREAM=http://127.0.0.1:8081`, `SENSORHEAD_THERMAL=upstream`,
   `SENSORHEAD_IAQ=upstream`, `PrivateDevices=true`. Dashboard binds
   `--host 127.0.0.1 --port 8081`. Bridge drop-in
-  `SENSORHEAD_URL=http://127.0.0.1:8080`. **Don't bind Python on `:8080`
-  again beside Rust. Don't set `native` or `SENSORHEAD_IAQ=helper` on the
-  public unit while the dashboard still inits the MLX / BME688.**
+  `SENSORHEAD_URL=http://127.0.0.1:8080`.   **Don't bind Python on `:8080`
+  again beside Rust. Don't set `native`, `SENSORHEAD_IAQ=helper`, or
+  `SENSORHEAD_CAMERAS=helper` on the public unit while the dashboard
+  still inits the MLX / BME688 / cameras.**
 
 - **`SENSORHEAD_IAQ` defaults to `upstream`.** The stdio helper is exclusive
   on 0x77 and writes the same `bsec_state.json` shape. `--doctor` only
   checks `import bme68x`. **Don't run the helper beside the dashboard.
   Don't point `SENSORHEAD_PYTHON` at the old venv. Don't invent a second
   state file during a probe — reuse the live `SENSORHEAD_DATA_DIR`.**
+
+- **`SENSORHEAD_CAMERAS` defaults to `upstream`.** The stdio helper is
+  exclusive on CSI. `--doctor` only checks `import picamera2`. **Don't
+  run the helper beside the dashboard. Don't `pip install picamera2`.
+  Don't treat an empty detect body as "picamera2 is missing".**
 
 - **`SENSORHEAD_THERMAL` defaults to `upstream`.** Native MLX90640 I2C is real
   (`mlx9064x` + `/dev/i2c-N`) but exclusive. Thin S4 still keeps

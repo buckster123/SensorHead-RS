@@ -176,6 +176,7 @@ Load only the relevant doc when entering a subsystem — do not load all of them
 | `crates/sensorhead-api` | HTTP drop-in — load when changing routes or the upstream proxy |
 | `docs/deploy.md` | Pi install + thin S4 (`:8080` Rust, `:8081` Python wall) |
 | `docs/bsec-sdk.md` | Operator BSEC egg path — doctor checks, never fetches |
+| `docs/picamera2.md` | Apt Picamera2 wall — doctor checks, never pip-installs |
 
 ---
 

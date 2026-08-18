@@ -27,7 +27,7 @@ ApexOS-RS sets `SENSORHEAD_URL`.
 
 | Endpoint | Purpose | Shape |
 |---|---|---|
-| `GET /health` | This process | `{ok, service: sensorhead-rs, version, git_sha, upstream, thermal, iaq}` |
+| `GET /health` | This process | `{ok, service: sensorhead-rs, version, git_sha, upstream, thermal, iaq, cameras}` |
 | `GET /api/status` | Health + which senses answered | Envelope is Rust (`server: SensorHead-RS`, `frontend`, `git_sha`). Nested `environment` / `thermal` / `cameras` / `i2c_devices` / `system` are copied from the Python upstream when it answers — including an honest camera error. Missing or failed upstream → those nests are unavailable/error, never a fake IAQ |
 | `GET /api/environment` | BME688 (+ BSEC2 when active) | JSON — see Types. ApexOS-RS reads `temperature_c`, `humidity_pct`, `pressure_hpa`, `iaq`, `co2_equivalent_ppm`, `breath_voc_ppm`, `iaq_accuracy`. If `error` is true, the bridge emits nothing |
 | `GET /api/environment/save-state` | Persist BSEC calibration blob | `{status: saved\|skipped, …}` |
@@ -115,6 +115,9 @@ reason.
 | `SENSORHEAD_PYTHON` | `/usr/bin/python3` | Interpreter for helpers. Never a venv |
 | `SENSORHEAD_BME68X_EGG` | unset | Operator-supplied pi3g egg (not in git) |
 | `SENSORHEAD_BME688_ADDR` | `0x77` | BME688 address for the helper |
+| `SENSORHEAD_CAMERAS` | `upstream` | `upstream` proxies Python camera routes. `helper` spawns `walls/cameras.py` on system Python + apt picamera2. Exclusive on CSI. A typo is a startup error |
+| `SENSORHEAD_CAMERAS_HELPER` | `walls/cameras.py` | Path to the Picamera2 stdio helper |
+| `SENSORHEAD_MODEL_DIR` | `/usr/share/imx500-models` | IMX500 `.rpk` directory for the helper |
 | `SENSORHEAD_URL` | unset | **Consumer** knob on ApexOS-RS, not this process |
 
 Seed-only until a config file earns its keep. BSEC state on disk **is**
