@@ -23,13 +23,18 @@ pass (house doctrine #5). Notes carry the date and the evidence.
       (238-byte blob, restores across restart); accuracy still 0 until
       the 48 h calibration. `/api/thermal/data` 768 floats. Native ironbow
       JPEG 200. Python still owns `:8080`.
-- [ ] **S4 — field cutover**: Rust on `:8080`, `SENSORHEAD_URL` on
-      `apex-sensor-bridge`, bridge emits AirQuality + ThermalFrame.
+- [x] **S4 — field cutover** (thin, 2026-08-18): Rust owns `0.0.0.0:8080`
+      (`fd4bb1c`, `thermal=upstream` → Python `127.0.0.1:8081`).
+      `apex-sensor-bridge` drop-in `SENSORHEAD_URL=http://127.0.0.1:8080`,
+      unit active. `agentd` journal: `AirQuality { iaq: 50.0, accuracy: 0 }`
+      + `ThermalFrame` after the swap. Visual/night JPEGs still proxy.
+      Native I2C not flipped.
 
 ## Post-v1 parking
 
 - Picamera2 / libcamera sidecar shape (stdio vs localhost vs bindgen)
-- Native MLX90640 I2C (gated; default stays upstream until S4).
+- Native MLX90640 I2C (gated; default stays `upstream` until Python
+      stops opening 0x33 and the unit gets `DeviceAllow=/dev/i2c-1`).
       **apex1 2026-08-18 exclusive probe:** dashboard stopped, `SENSORHEAD_THERMAL=native`
       on `:18081`, 768-float frame min 24.1 / max 32.6 / avg 26.7 °C, ironbow
       JPEG 320×240. Python dashboard restored; its next frame 24.5 / 32.8 / 26.8.
