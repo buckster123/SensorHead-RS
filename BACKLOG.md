@@ -22,6 +22,8 @@ pass (house doctrine #5). Notes carry the date and the evidence.
       served `/api/environment` (BSEC 2.6.1.0 keys present), `/api/thermal/data`
       (768 floats), and a native-ironbow `/api/thermal/heatmap` JPEG.
       Python still owns apex1 `:8080`.
+      `deploy/sensorhead-api.service` sits on loopback `:18080` so a Pi
+      install cannot clobber the live dashboard.
 - [ ] **S4 — field**: `SENSORHEAD_URL` on apex1 pointed at the Rust daemon; bridge still
       emits AirQuality + ThermalFrame; evidence recorded here.
 

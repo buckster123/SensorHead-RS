@@ -171,6 +171,7 @@ Load only the relevant doc when entering a subsystem — do not load all of them
 | `docs/gotchas.md` | **Any subsystem change — grep it first** |
 | `BACKLOG.md` | Outstanding work — slice ledger + parked items |
 | `crates/sensorhead-api` | HTTP drop-in — load when changing routes or the upstream proxy |
+| `docs/deploy.md` | Pi install beside the live Python unit — do not steal `:8080` |
 
 ---
 

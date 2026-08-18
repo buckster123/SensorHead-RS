@@ -81,6 +81,7 @@ Wire contract: [`docs/design.md`](docs/design.md).
 | [`docs/design.md`](docs/design.md) | The contract — wire format, API, invariants |
 | [`docs/upstream.md`](docs/upstream.md) | `py-source/` + BSEC2 / libcamera walls |
 | [`docs/CHARTER.md`](docs/CHARTER.md) | Binding decisions |
+| [`docs/deploy.md`](docs/deploy.md) | Sit beside the live Python unit on a Pi |
 | [`BACKLOG.md`](BACKLOG.md) | Slice ledger — what's shipped, what's next |
 
 ## License

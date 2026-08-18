@@ -1,0 +1,27 @@
+[Unit]
+Description=SensorHead-RS HTTP face — drop-in beside the Python dashboard
+After=network-online.target sensorhead-dashboard.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Live apex1 user. Change on other nodes.
+User=apex1
+Environment=SENSORHEAD_BIND=127.0.0.1:18080
+Environment=SENSORHEAD_UPSTREAM=http://127.0.0.1:8080
+EnvironmentFile=-/etc/sensorhead/env
+ExecStart=/usr/local/bin/sensorhead-api
+Restart=on-failure
+RestartSec=5
+
+# This binary opens no device nodes — it HTTP-polls the Python dashboard
+# (BSEC2 / Picamera2 walls) and serves the :8080 contract. Same sandbox
+# idea as apex-sensor-bridge.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+
+[Install]
+WantedBy=multi-user.target
