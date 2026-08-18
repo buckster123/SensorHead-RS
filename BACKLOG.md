@@ -29,7 +29,11 @@ pass (house doctrine #5). Notes carry the date and the evidence.
 ## Post-v1 parking
 
 - Picamera2 / libcamera sidecar shape (stdio vs localhost vs bindgen)
-- Native MLX90640 I2C vs one sidecar owning the whole bus
+- Native MLX90640 I2C (gated; default stays upstream until S4).
+      **apex1 2026-08-18 exclusive probe:** dashboard stopped, `SENSORHEAD_THERMAL=native`
+      on `:18081`, 768-float frame min 24.1 / max 32.6 / avg 26.7 °C, ironbow
+      JPEG 320×240. Python dashboard restored; its next frame 24.5 / 32.8 / 26.8.
+      Live sidecar stays `upstream` + `PrivateDevices=true`.
 - House MCP face (replace FastMCP)
 - ApexAurum cloud bridge
 - Pan-tilt / PCA9685

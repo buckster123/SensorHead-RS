@@ -106,6 +106,7 @@ reason.
 |-----|---------|---------|
 | `SENSORHEAD_BIND` | `127.0.0.1:8080` | HTTP listen (proposed; Python today is `--port`) |
 | `SENSORHEAD_DATA_DIR` | platform data dir | BSEC state + logs. ApexOS already uses this name for the Python unit |
+| `SENSORHEAD_THERMAL` | `upstream` | `upstream` proxies Python `/api/thermal/*`. `native` opens the MLX90640 on I2C (`SENSORHEAD_I2C_BUS`, `SENSORHEAD_MLX_ADDR`). Exclusive — do not combine with a live Python thermal owner. A typo is a startup error, not a silent proxy |
 | `SENSORHEAD_URL` | unset | **Consumer** knob on ApexOS-RS, not this process |
 
 Seed-only until a config file earns its keep. BSEC state on disk **is**

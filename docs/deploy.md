@@ -31,7 +31,22 @@ Optional knobs in `/etc/sensorhead/env` (`0600`, root-owned):
 ```
 SENSORHEAD_BIND=127.0.0.1:18080
 SENSORHEAD_UPSTREAM=http://127.0.0.1:8080
+# SENSORHEAD_THERMAL=upstream   # default — do not set native on this unit
 ```
+
+Exclusive native probe (stops the Python owner — brief):
+
+```sh
+sudo systemctl stop sensorhead-dashboard
+SENSORHEAD_BIND=127.0.0.1:18081 SENSORHEAD_THERMAL=native \
+  ./target/release/sensorhead-api
+# elsewhere:
+curl -sS http://127.0.0.1:18081/api/thermal/data
+sudo systemctl start sensorhead-dashboard
+```
+
+**Live on apex1 (2026-08-18):** native frame 24.1–32.6 °C (mean 26.7),
+JPEG 320×240. Python back on `:8080` afterwards.
 
 ## Cameras (Python wall on the Pi)
 

@@ -14,6 +14,19 @@ struct Args {
     /// Python (or other) SensorHead that still owns BSEC2 / Picamera2.
     #[arg(long, env = "SENSORHEAD_UPSTREAM")]
     upstream: Option<String>,
+
+    /// `upstream` (default) proxies Python. `native` opens the MLX90640
+    /// on I2C — exclusive; do not combine with a live Python thermal owner.
+    #[arg(long, env = "SENSORHEAD_THERMAL", default_value = "upstream")]
+    thermal: String,
+
+    /// I2C bus number for `SENSORHEAD_THERMAL=native` (`/dev/i2c-N`).
+    #[arg(long, env = "SENSORHEAD_I2C_BUS", default_value_t = 1)]
+    i2c_bus: u8,
+
+    /// MLX90640 7-bit address (default 0x33).
+    #[arg(long, env = "SENSORHEAD_MLX_ADDR", default_value_t = 0x33)]
+    mlx_addr: u8,
 }
 
 #[tokio::main]
@@ -26,8 +39,15 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     let args = Args::parse();
-    let state = AppState::new(args.upstream.clone())?;
-    tracing::info!(bind = %args.bind, upstream = ?args.upstream, "sensorhead-api starting");
+    let thermal = sensorhead::ThermalSource::parse(&args.thermal, args.i2c_bus, args.mlx_addr)
+        .map_err(|e| anyhow::anyhow!(e))?;
+    let state = AppState::with_thermal(args.upstream.clone(), thermal)?;
+    tracing::info!(
+        bind = %args.bind,
+        upstream = ?args.upstream,
+        thermal = thermal.as_str(),
+        "sensorhead-api starting"
+    );
     let listener = tokio::net::TcpListener::bind(&args.bind).await?;
     axum::serve(listener, router(state)).await?;
     Ok(())

@@ -3,8 +3,9 @@
 //! Hardware routes proxy to the live Python dashboard when
 //! `SENSORHEAD_UPSTREAM` is set (the BSEC2 / Picamera2 walls stay there).
 //! `/api/thermal/heatmap` is rendered in Rust from `/api/thermal/data`.
+//! Thermal frames come from upstream unless `SENSORHEAD_THERMAL=native`.
 
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use axum::body::Body;
 use axum::extract::{Query, State};
@@ -13,24 +14,31 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
 use sensorhead::{
-    compose_status, render_heatmap, EnvironmentBody, ThermalBody, UpstreamView, HEATMAP_HEIGHT,
-    HEATMAP_WIDTH,
+    compose_status, render_heatmap, EnvironmentBody, NativeMlx, ThermalBody, ThermalSource,
+    UpstreamView, HEATMAP_HEIGHT, HEATMAP_WIDTH,
 };
 use serde::Deserialize;
 
-#[derive(Clone)]
 pub struct AppState {
     pub upstream: Option<String>,
+    pub thermal: ThermalSource,
+    pub mlx: Mutex<NativeMlx>,
     pub client: reqwest::Client,
 }
 
 impl AppState {
     pub fn new(upstream: Option<String>) -> anyhow::Result<Self> {
+        Self::with_thermal(upstream, ThermalSource::Upstream)
+    }
+
+    pub fn with_thermal(upstream: Option<String>, thermal: ThermalSource) -> anyhow::Result<Self> {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(8))
             .build()?;
         Ok(Self {
             upstream: upstream.filter(|s| !s.is_empty()),
+            thermal,
+            mlx: Mutex::new(NativeMlx::new()),
             client,
         })
     }
@@ -72,6 +80,7 @@ async fn health(State(st): State<Arc<AppState>>) -> impl IntoResponse {
         "version": env!("CARGO_PKG_VERSION"),
         "git_sha": git_sha(),
         "upstream": st.upstream,
+        "thermal": st.thermal.as_str(),
     }))
 }
 
@@ -116,9 +125,12 @@ async fn environment(State(st): State<Arc<AppState>>) -> Response {
 }
 
 async fn thermal_data(State(st): State<Arc<AppState>>) -> Response {
-    match fetch_upstream(&st, "/api/thermal/data").await {
-        Ok(resp) => forward(resp).await,
-        Err(reason) => Json(ThermalBody::unavailable(reason)).into_response(),
+    match st.thermal {
+        ThermalSource::Native { .. } => Json(native_thermal(&st).await).into_response(),
+        ThermalSource::Upstream => match fetch_upstream(&st, "/api/thermal/data").await {
+            Ok(resp) => forward(resp).await,
+            Err(reason) => Json(ThermalBody::unavailable(reason)).into_response(),
+        },
     }
 }
 
@@ -134,6 +146,9 @@ async fn thermal_heatmap(
 ) -> Response {
     let width = q.width.unwrap_or(HEATMAP_WIDTH);
     let height = q.height.unwrap_or(HEATMAP_HEIGHT);
+    if matches!(st.thermal, ThermalSource::Native { .. }) {
+        return heatmap_from_body(native_thermal(&st).await, width, height);
+    }
     let resp = match fetch_upstream(&st, "/api/thermal/data").await {
         Ok(r) => r,
         Err(reason) => {
@@ -164,6 +179,26 @@ async fn thermal_heatmap(
                 .into_response();
         }
     };
+    heatmap_from_body(body, width, height)
+}
+
+async fn native_thermal(st: &Arc<AppState>) -> ThermalBody {
+    let ThermalSource::Native { bus, addr } = st.thermal else {
+        return ThermalBody::unavailable("thermal source is not native");
+    };
+    let st = Arc::clone(st);
+    match tokio::task::spawn_blocking(move || {
+        let mut guard = st.mlx.lock().unwrap_or_else(|e| e.into_inner());
+        guard.read(bus, addr)
+    })
+    .await
+    {
+        Ok(body) => body,
+        Err(e) => ThermalBody::unavailable(format!("native thermal task: {e}")),
+    }
+}
+
+fn heatmap_from_body(body: ThermalBody, width: u32, height: u32) -> Response {
     if body.error {
         return (
             StatusCode::INTERNAL_SERVER_ERROR,
@@ -305,6 +340,32 @@ mod tests {
         assert_eq!(v["version"], "0.1.0");
         assert!(v["git_sha"].as_str().is_some_and(|s| !s.is_empty()));
         assert!(v["upstream"].is_null());
+        assert_eq!(v["thermal"], "upstream");
+    }
+
+    #[tokio::test]
+    async fn native_thermal_without_a_device_is_honest() {
+        let app = router(
+            AppState::with_thermal(None, ThermalSource::Native { bus: 1, addr: 0x33 }).unwrap(),
+        );
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/thermal/data")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        let bytes = to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
+        let body = ThermalBody::parse(&bytes).unwrap();
+        assert!(body.error);
+        assert!(body.frame.is_none());
+        let reason = body.reason.unwrap_or_default();
+        assert!(
+            reason.contains("i2c") || reason.contains("MLX") || reason.contains("Linux"),
+            "{reason}"
+        );
     }
 
     #[tokio::test]
