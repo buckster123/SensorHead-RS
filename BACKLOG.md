@@ -18,8 +18,10 @@ pass (house doctrine #5). Notes carry the date and the evidence.
       `/api/status` envelope `SensorHead-RS` + I2C 0x33/0x77. Same-day
       follow-up: apt `python3-picamera2` + venv system-site-packages;
       both CSI cameras live; visual/night JPEGs on `:8080` and `:18080`.
-      `/api/environment` BSEC keys present (accuracy 0 — no
-      `bsec_state.json`). `/api/thermal/data` 768 floats. Native ironbow
+      `/api/environment` BSEC keys present. Same-day
+      `buckster123/SensorHead` #2: `bsec_state.json` now persists
+      (238-byte blob, restores across restart); accuracy still 0 until
+      the 48 h calibration. `/api/thermal/data` 768 floats. Native ironbow
       JPEG 200. Python still owns `:8080`.
 - [ ] **S4 — field cutover**: Rust on `:8080`, `SENSORHEAD_URL` on
       `apex-sensor-bridge`, bridge emits AirQuality + ThermalFrame.

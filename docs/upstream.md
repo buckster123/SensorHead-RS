@@ -47,6 +47,10 @@ includes a prebuilt
 
 `bme68x-2.6.1-py3.13-linux-aarch64.egg`.
 
+Calibration state is `data/bsec_state.json` next to that checkout (or
+`SENSORHEAD_DATA_DIR`). The original hardcoded `/home/hailo/...` path is
+gone as of `buckster123/SensorHead` #2 — see `docs/gotchas.md`.
+
 BSEC is closed-source C. It is what turns raw MOX gas resistance into IAQ,
 CO₂-equivalent, breath-VOC, and heater-compensated T/RH. ApexOS-RS already
 documents that **BSEC is optional**: `adafruit_bme680` raw mode still yields
