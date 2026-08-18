@@ -8,6 +8,7 @@
 //! decisions. The Python original is the read-only checkout at `py-source/`.
 
 pub mod bsec;
+pub mod cameras;
 pub mod environment;
 pub mod error;
 pub mod iaq;
@@ -17,6 +18,7 @@ pub mod status;
 pub mod thermal;
 
 pub use bsec::IaqSource;
+pub use cameras::CameraSource;
 pub use environment::EnvironmentBody;
 pub use error::{Error, Result};
 pub use iaq::{iaq_accuracy_label, iaq_band};

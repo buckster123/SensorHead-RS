@@ -9,6 +9,7 @@ description = "SensorHead-RS HTTP face — drop-in :8080, walls via upstream"
 [dependencies]
 anyhow.workspace = true
 axum.workspace = true
+base64.workspace = true
 clap.workspace = true
 image.workspace = true
 reqwest.workspace = true

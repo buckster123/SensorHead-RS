@@ -39,7 +39,10 @@ pass (house doctrine #5). Notes carry the date and the evidence.
       restored 238-byte state, `/api/environment` `source=helper`
       BSEC 2.6.1.0 iaq 0.0 accuracy 1, save-state wrote the live
       `bsec_state.json`. Public unit left on `upstream`.
-- Picamera2 / libcamera stdio helper (same D9 shape as BSEC)
+- [ ] **S6 — Picamera2 stdio helper** (gated): `walls/cameras.py` +
+      `SENSORHEAD_CAMERAS=helper` on system Python. Default stays `upstream`.
+      `--doctor` checks the apt import, never pip-installs. Tick after the
+      exclusive apex1 probe.
 - `bindgen` to BSEC C (after the helper is the live nose)
 - Native MLX90640 I2C (gated; default stays `upstream` until Python
       stops opening 0x33 and the unit gets `DeviceAllow=/dev/i2c-1`).

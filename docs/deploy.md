@@ -69,9 +69,28 @@ restored the 238-byte state, returned `source=helper` BSEC 2.6.1.0
 (iaq 0.0, accuracy 1), and saved the live state file. Public unit
 stayed `SENSORHEAD_IAQ=upstream`.
 
+Exclusive Picamera2 helper probe (stops the Python owner — brief). See
+`docs/picamera2.md`.
+
+```sh
+sudo systemctl stop sensorhead-dashboard
+SENSORHEAD_BIND=127.0.0.1:18081 \
+SENSORHEAD_CAMERAS=helper \
+SENSORHEAD_CAMERAS_HELPER=/home/apex1/SensorHead-RS/walls/cameras.py \
+SENSORHEAD_PYTHON=/usr/bin/python3 \
+  ./target/release/sensorhead-api
+# elsewhere:
+curl -sS http://127.0.0.1:18081/health
+curl -sS -o /tmp/visual.jpg -D- http://127.0.0.1:18081/api/capture/visual
+curl -sS -o /tmp/night.jpg -D- http://127.0.0.1:18081/api/capture/night
+sudo systemctl start sensorhead-dashboard
+```
+
 ## Cameras (Python wall on the Pi)
 
-Still capture and IMX500 inference stay in the Python dashboard. On
+Still capture and IMX500 inference default to the Python dashboard
+(`SENSORHEAD_CAMERAS=upstream`). The in-repo wall is `walls/cameras.py`.
+On
 Raspberry Pi OS / Debian trixie with the Pi repo:
 
 ```sh
