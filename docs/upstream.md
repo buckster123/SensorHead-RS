@@ -68,6 +68,10 @@ path is `picamera2.devices.imx500.IMX500` — on-chip detection / classify / pos
 Python stack over a C++ libcamera pipeline. There is no honest pure-Rust
 replacement for IMX500 model load + metadata today.
 
+On the Pi this is an **apt** stack (`python3-picamera2`, `python3-libcamera`,
+`imx500-firmware`, `imx500-models`), not a PyPI wheel. The live venv must
+see `/usr/lib/python3/dist-packages` (see `docs/gotchas.md` / `docs/deploy.md`).
+
 What this means for Rust:
 
 - Still capture and inference stay behind a Picamera2 sidecar (or a future

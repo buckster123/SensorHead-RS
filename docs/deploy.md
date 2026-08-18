@@ -33,6 +33,28 @@ SENSORHEAD_BIND=127.0.0.1:18080
 SENSORHEAD_UPSTREAM=http://127.0.0.1:8080
 ```
 
+## Cameras (Python wall on the Pi)
+
+Still capture and IMX500 inference stay in the Python dashboard. On
+Raspberry Pi OS / Debian trixie with the Pi repo:
+
+```sh
+sudo apt install -y python3-picamera2 python3-libcamera \
+  imx500-firmware imx500-models rpicam-apps-imx500-postprocess
+# existing venv — do not recreate (BSEC egg lives there)
+sed -i 's/^include-system-site-packages = false$/include-system-site-packages = true/' \
+  /home/apex1/SensorHead/venv/pyvenv.cfg
+sudo systemctl restart sensorhead-dashboard
+```
+
+`rpicam-hello` / `rpicam-still` proving the CSI bus is not enough — the
+dashboard venv must import `picamera2` from `/usr/lib/python3/dist-packages`.
+
+**Live on apex1 (2026-08-18, later the same day as the sidecar):** both
+CSI cameras answer. Visual 2028×1520 and NoIR 2304×1296 JPEGs via
+`:8080` and `:18080`. Detect reaches the chip; first outputs were empty
+(see `docs/gotchas.md`).
+
 ## Cutover (S4 — not this slice)
 
 Move Python to a side port, point `SENSORHEAD_BIND` at `0.0.0.0:8080`,
