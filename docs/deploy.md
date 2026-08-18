@@ -3,11 +3,11 @@
 House Pi/systemd pattern: `~/Projects/Launchpad-RS/docs/deploy.md`.
 **Build on the target. Never cross-compile.**
 
-## Sit beside the live Python dashboard (safe)
+## Sit beside the live Python dashboard (safe / pre-cutover)
 
-apex1 already owns `:8080` (`sensorhead-dashboard.service`). This unit
-listens on loopback `:18080` and proxies that dashboard. It cannot steal
-the public port by accident.
+Use this on a node where Python still owns `:8080`. The unit listens on
+loopback `:18080` and cannot steal the public port by accident. apex1
+has moved on — see thin S4 below.
 
 ```sh
 # on the Pi
@@ -22,16 +22,13 @@ curl -s http://127.0.0.1:18080/health
 curl -s http://127.0.0.1:18080/api/environment
 ```
 
-**Live on apex1 (2026-08-18):** unit `sensorhead-api.service` is enabled,
-binary at `/usr/local/bin/sensorhead-api`, checkout `~/SensorHead-RS`
-(`b2efe29`). Python still owns `:8080`.
-
-Optional knobs in `/etc/sensorhead/env` (`0600`, root-owned):
+Optional knobs in `/etc/sensorhead/env` (`0600`, root-owned) — on a
+pre-cutover sidecar:
 
 ```
 SENSORHEAD_BIND=127.0.0.1:18080
 SENSORHEAD_UPSTREAM=http://127.0.0.1:8080
-# SENSORHEAD_THERMAL=upstream   # default — do not set native on this unit
+# SENSORHEAD_THERMAL=upstream
 ```
 
 Exclusive native probe (stops the Python owner — brief):
@@ -83,8 +80,32 @@ curl -sS http://127.0.0.1:8080/api/environment/save-state
 # {status: saved, file: /home/apex1/SensorHead/data/bsec_state.json}
 ```
 
-## Cutover (S4 — not this slice)
+## Thin cutover (S4 — live on apex1 2026-08-18)
 
-Move Python to a side port, point `SENSORHEAD_BIND` at `0.0.0.0:8080`,
-set `SENSORHEAD_URL=http://127.0.0.1:8080` on `apex-sensor-bridge`,
-enable the bridge. Do that as its own slice, with evidence on apex1.
+Python is the BSEC / Picamera2 wall on loopback `:8081`. Rust owns
+public `:8080` and proxies that wall. `SENSORHEAD_THERMAL` stays
+`upstream`. The sidecar port `:18080` is gone.
+
+```sh
+# files in deploy/cutover/
+sudo mkdir -p /etc/sensorhead \
+  /etc/systemd/system/sensorhead-dashboard.service.d \
+  /etc/systemd/system/apex-sensor-bridge.service.d
+sudo install -m 0600 deploy/cutover/sensorhead.env /etc/sensorhead/env
+sudo cp deploy/cutover/sensorhead-dashboard.conf \
+  /etc/systemd/system/sensorhead-dashboard.service.d/port.conf
+sudo cp deploy/cutover/apex-sensor-bridge-sensorhead.conf \
+  /etc/systemd/system/apex-sensor-bridge.service.d/sensorhead.conf
+sudo systemctl daemon-reload
+sudo systemctl restart sensorhead-dashboard sensorhead-api
+sudo systemctl restart apex-sensor-bridge
+curl -sS http://127.0.0.1:8080/health
+# service=sensorhead-rs thermal=upstream upstream=http://127.0.0.1:8081
+```
+
+**Live evidence (apex1, same afternoon):** `/health` `git_sha=fd4bb1c`.
+Environment BSEC body on `:8080`. Thermal 768 floats. Visual 2028×1520
+and NoIR 2304×1296 JPEGs. `apex-sensor-bridge` connected;
+`agentd` logged `AirQuality` + `ThermalFrame` after the port swap
+(accuracy 0 still stabilizing). Rollback: remove the two drop-ins and
+`/etc/sensorhead/env`, daemon-reload, restart the three units.

@@ -20,7 +20,10 @@ push policy, or dashboard HTML.
 
 ## The wire / API surface
 
-Default bind: `http://127.0.0.1:8080` (loopback). ApexOS-RS sets `SENSORHEAD_URL`.
+Default bind in the binary is loopback `:8080` so a laptop run cannot steal
+a live node. Thin S4 on apex1 overrides via `/etc/sensorhead/env` to
+`0.0.0.0:8080` with `SENSORHEAD_UPSTREAM=http://127.0.0.1:8081`.
+ApexOS-RS sets `SENSORHEAD_URL`.
 
 | Endpoint | Purpose | Shape |
 |---|---|---|

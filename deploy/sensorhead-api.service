@@ -7,6 +7,9 @@ Wants=network-online.target
 Type=simple
 # Live apex1 user. Change on other nodes.
 User=apex1
+# Safe sidecar defaults. Thin S4 overrides via /etc/sensorhead/env
+# (BIND=0.0.0.0:8080, UPSTREAM=http://127.0.0.1:8081). EnvironmentFile
+# is parsed after these lines, so the env file wins on cutover nodes.
 Environment=SENSORHEAD_BIND=127.0.0.1:18080
 Environment=SENSORHEAD_UPSTREAM=http://127.0.0.1:8080
 EnvironmentFile=-/etc/sensorhead/env

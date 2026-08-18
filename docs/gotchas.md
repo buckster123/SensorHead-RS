@@ -37,11 +37,19 @@
   `apex-sensor-bridge` is `PrivateDevices=true` on purpose. **Don't open `/dev/i2c-*`
   or CSI from an ApexOS-RS crate "to simplify".**
 
+- **Thin S4: Rust is the public `:8080` face; Python is the loopback wall.**
+  apex1 2026-08-18: `sensorhead-api` `0.0.0.0:8080` →
+  `SENSORHEAD_UPSTREAM=http://127.0.0.1:8081`, `SENSORHEAD_THERMAL=upstream`,
+  `PrivateDevices=true`. Dashboard binds `--host 127.0.0.1 --port 8081`.
+  Bridge drop-in `SENSORHEAD_URL=http://127.0.0.1:8080`. **Don't bind
+  Python on `:8080` again beside Rust. Don't set `native` on this unit
+  while the dashboard still inits the MLX.**
+
 - **`SENSORHEAD_THERMAL` defaults to `upstream`.** Native MLX90640 I2C is real
-  (`mlx9064x` + `/dev/i2c-N`) but exclusive. The live `sensorhead-api.service`
-  is `PrivateDevices=true` and must stay that way until S4. **Don't point the
-  sidecar at `native` while `sensorhead-dashboard` still holds the bus. Don't
-  drop `PrivateDevices` on the sidecar "to try native".**
+  (`mlx9064x` + `/dev/i2c-N`) but exclusive. Thin S4 still keeps
+  `PrivateDevices=true` because Python owns the bus. **Don't point the
+  public unit at `native` while `sensorhead-dashboard` still inits the MLX.
+  Don't drop `PrivateDevices` "to try native".**
 
 - **Pi 5 I2C needs `i2c-dev`, not just `dtparam=i2c_arm=on`.** Without the module there
   are no `/dev/i2c-*` nodes. ApexOS-RS `install.sh` provisions this when the sensor
@@ -70,24 +78,17 @@
 - **`py-source/` is read-only and gitignored.** **Don't edit the checkout; don't
   `git add` it.**
 
-- **apex1 2026-08-18 field read.** `sensorhead-dashboard.service` is the live
-  Python unit (`/home/apex1/SensorHead/venv`, binds `0.0.0.0:8080`). I2C shows
-  BME688@0x77 + MLX90640@0x33. BSEC 2.6.1.0 **is** in that venv
-  (`bme68x-2.6.1-py3.13-linux-aarch64.egg`) and `/api/environment` returns
-  `iaq`. Accuracy is still 0 (stabilizing) — that is honest, not a missing
-  file.
-  Cameras: CAM0 `imx708_wide_noir`, CAM1 `imx500`. After apt
-  `python3-picamera2` + flipping the venv to system site-packages,
-  `/api/status` reports both, and `/api/capture/visual` + `/night` return
-  JPEGs on `:8080` and the Rust sidecar `:18080`. `/api/models` lists every
-  bundled `.rpk` as installed. `/api/detect` reaches the IMX500 path
-  (EfficientDet load ~5 s) and returns the original's
-  `{"detections":[],"error":"No inference output"}` — firmware just
-  landed; 5 s warmup + 4 s poll may be short. `apex-sensor-bridge` is
-  inactive and has no `SENSORHEAD_URL`. **Don't assume the ApexOS-RS
-  "raw-mode, no BSEC" note is still the live truth — probe
-  `/api/environment`. Don't treat accuracy-0 IAQ as a calibrated nose.
-  Don't treat an empty detect body as "picamera2 is missing".**
+- **apex1 2026-08-18 field read.** After thin S4, `sensorhead-api` owns
+  `0.0.0.0:8080` (`git_sha=fd4bb1c`); Python is `127.0.0.1:8081`. I2C
+  shows BME688@0x77 + MLX90640@0x33. BSEC 2.6.1.0 **is** in the venv
+  and `/api/environment` returns `iaq` (accuracy 0, stabilizing).
+  Cameras: CAM0 `imx708_wide_noir`, CAM1 `imx500`; visual/night JPEGs
+  on `:8080`. `apex-sensor-bridge` is active with
+  `SENSORHEAD_URL=http://127.0.0.1:8080`; `agentd` logs `AirQuality` +
+  `ThermalFrame`. **Don't assume the ApexOS-RS "raw-mode, no BSEC" note
+  is still the live truth — probe `/api/environment`. Don't treat
+  accuracy-0 IAQ as a calibrated nose. Don't treat an empty detect body
+  as "picamera2 is missing".**
 
 - **`data_dir` was `/home/hailo/...`, not a BSEC-dead process.** Journal on
   apex1 (2026-08-17 → 18): `Failed to save BSEC state: [Errno 13] Permission
