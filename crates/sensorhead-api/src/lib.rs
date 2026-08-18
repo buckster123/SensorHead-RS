@@ -12,7 +12,10 @@ use axum::http::{header, HeaderValue, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
-use sensorhead::{render_heatmap, EnvironmentBody, ThermalBody, HEATMAP_HEIGHT, HEATMAP_WIDTH};
+use sensorhead::{
+    compose_status, render_heatmap, EnvironmentBody, ThermalBody, UpstreamView, HEATMAP_HEIGHT,
+    HEATMAP_WIDTH,
+};
 use serde::Deserialize;
 
 #[derive(Clone)]
@@ -40,7 +43,7 @@ pub fn router(state: AppState) -> Router {
         .route("/api/environment/save-state", get(proxy_named))
         .route("/api/thermal/data", get(thermal_data))
         .route("/api/thermal/heatmap", get(thermal_heatmap))
-        .route("/api/status", get(proxy_named))
+        .route("/api/status", get(status))
         .route("/api/models", get(proxy_named))
         .route("/api/capture/visual", get(proxy_named))
         .route("/api/capture/night", get(proxy_named))
@@ -51,12 +54,58 @@ pub fn router(state: AppState) -> Router {
         .with_state(Arc::new(state))
 }
 
+pub fn git_sha() -> &'static str {
+    option_env!("SENSORHEAD_GIT_SHA").unwrap_or("unknown")
+}
+
+fn now_secs() -> f64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs_f64())
+        .unwrap_or(0.0)
+}
+
 async fn health(State(st): State<Arc<AppState>>) -> impl IntoResponse {
     Json(serde_json::json!({
         "ok": true,
         "service": "sensorhead-rs",
+        "version": env!("CARGO_PKG_VERSION"),
+        "git_sha": git_sha(),
         "upstream": st.upstream,
     }))
+}
+
+enum StatusLoad {
+    Missing,
+    Failed(String),
+    Body(serde_json::Value),
+}
+
+async fn load_upstream_status(st: &AppState) -> StatusLoad {
+    if st.upstream.is_none() {
+        return StatusLoad::Missing;
+    }
+    match fetch_upstream(st, "/api/status").await {
+        Ok(resp) => match resp.bytes().await {
+            Ok(bytes) => match serde_json::from_slice(&bytes) {
+                Ok(body) => StatusLoad::Body(body),
+                Err(e) => StatusLoad::Failed(e.to_string()),
+            },
+            Err(e) => StatusLoad::Failed(e.to_string()),
+        },
+        Err(reason) => StatusLoad::Failed(reason),
+    }
+}
+
+async fn status(State(st): State<Arc<AppState>>) -> impl IntoResponse {
+    let url = st.upstream.as_deref();
+    let load = load_upstream_status(&st).await;
+    let view = match &load {
+        StatusLoad::Missing => UpstreamView::Missing,
+        StatusLoad::Failed(reason) => UpstreamView::Failed(reason),
+        StatusLoad::Body(body) => UpstreamView::Body(body),
+    };
+    Json(compose_status(now_secs(), git_sha(), url, view))
 }
 
 async fn environment(State(st): State<Arc<AppState>>) -> Response {
@@ -253,7 +302,31 @@ mod tests {
         let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
         assert_eq!(v["ok"], true);
         assert_eq!(v["service"], "sensorhead-rs");
+        assert_eq!(v["version"], "0.1.0");
+        assert!(v["git_sha"].as_str().is_some_and(|s| !s.is_empty()));
         assert!(v["upstream"].is_null());
+    }
+
+    #[tokio::test]
+    async fn status_without_upstream_is_composed_and_honest() {
+        let app = router(AppState::new(None).unwrap());
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/status")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
+        let v: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        assert_eq!(v["server"], "SensorHead-RS");
+        assert_eq!(v["frontend"], "sensorhead-rs");
+        assert_eq!(v["environment"]["error"], true);
+        assert!(v.get("iaq").is_none());
+        assert_eq!(v["cameras"]["error"], "no upstream configured");
     }
 
     #[tokio::test]

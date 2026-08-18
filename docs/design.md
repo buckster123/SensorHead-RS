@@ -24,7 +24,8 @@ Default bind: `http://127.0.0.1:8080` (loopback). ApexOS-RS sets `SENSORHEAD_URL
 
 | Endpoint | Purpose | Shape |
 |---|---|---|
-| `GET /api/status` | Health + which senses answered | JSON object; `environment` / `thermal` / `cameras` may each be a reading, `{status: not_detected}`, or `{error: …}` |
+| `GET /health` | This process | `{ok, service: sensorhead-rs, version, git_sha, upstream}` |
+| `GET /api/status` | Health + which senses answered | Envelope is Rust (`server: SensorHead-RS`, `frontend`, `git_sha`). Nested `environment` / `thermal` / `cameras` / `i2c_devices` / `system` are copied from the Python upstream when it answers — including an honest camera error. Missing or failed upstream → those nests are unavailable/error, never a fake IAQ |
 | `GET /api/environment` | BME688 (+ BSEC2 when active) | JSON — see Types. ApexOS-RS reads `temperature_c`, `humidity_pct`, `pressure_hpa`, `iaq`, `co2_equivalent_ppm`, `breath_voc_ppm`, `iaq_accuracy`. If `error` is true, the bridge emits nothing |
 | `GET /api/environment/save-state` | Persist BSEC calibration blob | `{status: saved\|skipped, …}` |
 | `GET /api/thermal/data` | MLX90640 32×24 grid | JSON — `frame` (768 °C floats, row-major), `rows` 24, `cols` 32, `min_c`, `max_c`, `avg_c`. Gateway proxies the frame; the bridge forwards only the three scalars (`avg_c` → `mean_c` on the WS side) |
