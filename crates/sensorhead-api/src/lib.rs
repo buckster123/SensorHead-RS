@@ -1,9 +1,12 @@
 //! HTTP face over the SensorHead contract.
 //!
 //! Hardware routes proxy to the live Python dashboard when
-//! `SENSORHEAD_UPSTREAM` is set (the BSEC2 / Picamera2 walls stay there).
+//! `SENSORHEAD_UPSTREAM` is set (Picamera2 and, by default, BSEC stay there).
+//! `SENSORHEAD_IAQ=helper` reads BSEC via `walls/bsec.py` on system Python.
 //! `/api/thermal/heatmap` is rendered in Rust from `/api/thermal/data`.
 //! Thermal frames come from upstream unless `SENSORHEAD_THERMAL=native`.
+
+mod bsec_wall;
 
 use std::sync::{Arc, Mutex};
 
@@ -14,15 +17,19 @@ use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use axum::{Json, Router};
 use sensorhead::{
-    compose_status, render_heatmap, EnvironmentBody, NativeMlx, ThermalBody, ThermalSource,
-    UpstreamView, HEATMAP_HEIGHT, HEATMAP_WIDTH,
+    compose_status, render_heatmap, EnvironmentBody, IaqSource, NativeMlx, ThermalBody,
+    ThermalSource, UpstreamView, HEATMAP_HEIGHT, HEATMAP_WIDTH,
 };
 use serde::Deserialize;
+
+pub use bsec_wall::{doctor, BsecHelperConfig, DoctorReport};
 
 pub struct AppState {
     pub upstream: Option<String>,
     pub thermal: ThermalSource,
+    pub iaq: IaqSource,
     pub mlx: Mutex<NativeMlx>,
+    pub bsec: tokio::sync::Mutex<bsec_wall::BsecWall>,
     pub client: reqwest::Client,
 }
 
@@ -32,13 +39,29 @@ impl AppState {
     }
 
     pub fn with_thermal(upstream: Option<String>, thermal: ThermalSource) -> anyhow::Result<Self> {
+        Self::with_sources(
+            upstream,
+            thermal,
+            IaqSource::Upstream,
+            BsecHelperConfig::default(),
+        )
+    }
+
+    pub fn with_sources(
+        upstream: Option<String>,
+        thermal: ThermalSource,
+        iaq: IaqSource,
+        bsec: BsecHelperConfig,
+    ) -> anyhow::Result<Self> {
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(8))
             .build()?;
         Ok(Self {
             upstream: upstream.filter(|s| !s.is_empty()),
             thermal,
+            iaq,
             mlx: Mutex::new(NativeMlx::new()),
+            bsec: tokio::sync::Mutex::new(bsec_wall::BsecWall::new(bsec)),
             client,
         })
     }
@@ -48,7 +71,7 @@ pub fn router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/api/environment", get(environment))
-        .route("/api/environment/save-state", get(proxy_named))
+        .route("/api/environment/save-state", get(save_state))
         .route("/api/thermal/data", get(thermal_data))
         .route("/api/thermal/heatmap", get(thermal_heatmap))
         .route("/api/status", get(status))
@@ -81,6 +104,7 @@ async fn health(State(st): State<Arc<AppState>>) -> impl IntoResponse {
         "git_sha": git_sha(),
         "upstream": st.upstream,
         "thermal": st.thermal.as_str(),
+        "iaq": st.iaq.as_str(),
     }))
 }
 
@@ -114,13 +138,45 @@ async fn status(State(st): State<Arc<AppState>>) -> impl IntoResponse {
         StatusLoad::Failed(reason) => UpstreamView::Failed(reason),
         StatusLoad::Body(body) => UpstreamView::Body(body),
     };
-    Json(compose_status(now_secs(), git_sha(), url, view))
+    let mut body = compose_status(now_secs(), git_sha(), url, view);
+    if st.iaq == IaqSource::Helper {
+        let env = {
+            let mut wall = st.bsec.lock().await;
+            wall.read().await
+        };
+        if let Ok(v) = serde_json::to_value(env) {
+            body["environment"] = v;
+        }
+    }
+    Json(body)
 }
 
 async fn environment(State(st): State<Arc<AppState>>) -> Response {
-    match fetch_upstream(&st, "/api/environment").await {
-        Ok(resp) => forward(resp).await,
-        Err(reason) => Json(EnvironmentBody::unavailable(reason)).into_response(),
+    match st.iaq {
+        IaqSource::Helper => {
+            let body = {
+                let mut wall = st.bsec.lock().await;
+                wall.read().await
+            };
+            Json(body).into_response()
+        }
+        IaqSource::Upstream => match fetch_upstream(&st, "/api/environment").await {
+            Ok(resp) => forward(resp).await,
+            Err(reason) => Json(EnvironmentBody::unavailable(reason)).into_response(),
+        },
+    }
+}
+
+async fn save_state(State(st): State<Arc<AppState>>, uri: Uri) -> Response {
+    match st.iaq {
+        IaqSource::Helper => {
+            let body = {
+                let mut wall = st.bsec.lock().await;
+                wall.save_state().await
+            };
+            Json(body).into_response()
+        }
+        IaqSource::Upstream => proxy_path(&st, uri.path(), uri.query()).await,
     }
 }
 
@@ -341,6 +397,49 @@ mod tests {
         assert!(v["git_sha"].as_str().is_some_and(|s| !s.is_empty()));
         assert!(v["upstream"].is_null());
         assert_eq!(v["thermal"], "upstream");
+        assert_eq!(v["iaq"], "upstream");
+    }
+
+    fn repo_bsec_cfg() -> BsecHelperConfig {
+        BsecHelperConfig {
+            python: std::path::PathBuf::from("python3"),
+            script: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("../../walls/bsec.py"),
+            ..BsecHelperConfig::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn helper_iaq_without_egg_is_honest() {
+        let app = router(
+            AppState::with_sources(
+                None,
+                ThermalSource::Upstream,
+                IaqSource::Helper,
+                repo_bsec_cfg(),
+            )
+            .unwrap(),
+        );
+        let resp = app
+            .oneshot(
+                Request::builder()
+                    .uri("/api/environment")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let bytes = to_bytes(resp.into_body(), 64 * 1024).await.unwrap();
+        let env = EnvironmentBody::parse(&bytes).unwrap();
+        assert!(env.error);
+        assert!(env.iaq.is_none());
+        assert!(!env.apexos_air_quality_possible());
+        let reason = env.reason.unwrap_or_default();
+        assert!(
+            reason.contains("bme68x") || reason.contains("not importable"),
+            "{reason}"
+        );
     }
 
     #[tokio::test]

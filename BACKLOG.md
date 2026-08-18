@@ -32,7 +32,12 @@ pass (house doctrine #5). Notes carry the date and the evidence.
 
 ## Post-v1 parking
 
-- Picamera2 / libcamera sidecar shape (stdio vs localhost vs bindgen)
+- [ ] **S5 — BSEC stdio helper** (gated): `walls/bsec.py` +
+      `SENSORHEAD_IAQ=helper` on system Python. Default stays `upstream`.
+      `--doctor` checks the import, never fetches the egg. Tick after the
+      exclusive apex1 probe.
+- Picamera2 / libcamera stdio helper (same D9 shape as BSEC)
+- `bindgen` to BSEC C (after the helper is the live nose)
 - Native MLX90640 I2C (gated; default stays `upstream` until Python
       stops opening 0x33 and the unit gets `DeviceAllow=/dev/i2c-1`).
       **apex1 2026-08-18 exclusive probe:** dashboard stopped, `SENSORHEAD_THERMAL=native`

@@ -45,6 +45,24 @@ sudo systemctl start sensorhead-dashboard
 **Live on apex1 (2026-08-18):** native frame 24.1–32.6 °C (mean 26.7),
 JPEG 320×240. Python back on `:8080` afterwards.
 
+Exclusive BSEC helper probe (stops the Python owner — brief). Reuse the
+live state file. See `docs/bsec-sdk.md`.
+
+```sh
+sudo systemctl stop sensorhead-dashboard
+EGG=$(find /home/apex1/SensorHead/venv -name 'bme68x-*.egg' | head -1)
+SENSORHEAD_BIND=127.0.0.1:18081 \
+SENSORHEAD_IAQ=helper \
+SENSORHEAD_BSEC_HELPER=/home/apex1/SensorHead-RS/walls/bsec.py \
+SENSORHEAD_PYTHON=/usr/bin/python3 \
+SENSORHEAD_BME68X_EGG="$EGG" \
+SENSORHEAD_DATA_DIR=/home/apex1/SensorHead/data \
+  /usr/local/bin/sensorhead-api
+# elsewhere:
+curl -sS http://127.0.0.1:18081/api/environment
+sudo systemctl start sensorhead-dashboard
+```
+
 ## Cameras (Python wall on the Pi)
 
 Still capture and IMX500 inference stay in the Python dashboard. On

@@ -15,8 +15,10 @@
 - **BSEC2 is the IAQ wall, not "the BME688 is Python".** Raw T/RH/P/gas work without
   Bosch via `adafruit_bme680` or native I2C. IAQ / CO₂eq / breath-VOC / compensated T+RH
   come from the closed-source BSEC C library (pi3g `bme68x` 2.6.1 on the live Pi).
-  ApexOS-RS already drops the AirQuality event when `iaq` is absent. **Don't invent an
-  IAQ from raw gas ohms, and don't vendor the BSEC `.egg` / `.so` into this git tree.**
+  ApexOS-RS already drops the AirQuality event when `iaq` is absent. The in-repo
+  wall is `walls/bsec.py` on system Python (`SENSORHEAD_IAQ=helper`). **Don't invent
+  an IAQ from raw gas ohms, don't vendor the BSEC `.egg` / `.so` into this git tree,
+  don't recreate a venv for the helper, and don't have install.sh fetch the SDK.**
 
 - **libcamera / Picamera2 is the camera wall, especially IMX500.** Still capture and
   on-chip detect/classify/pose go through `picamera2` (`devices.imx500.IMX500`).
@@ -40,10 +42,17 @@
 - **Thin S4: Rust is the public `:8080` face; Python is the loopback wall.**
   apex1 2026-08-18: `sensorhead-api` `0.0.0.0:8080` →
   `SENSORHEAD_UPSTREAM=http://127.0.0.1:8081`, `SENSORHEAD_THERMAL=upstream`,
-  `PrivateDevices=true`. Dashboard binds `--host 127.0.0.1 --port 8081`.
-  Bridge drop-in `SENSORHEAD_URL=http://127.0.0.1:8080`. **Don't bind
-  Python on `:8080` again beside Rust. Don't set `native` on this unit
-  while the dashboard still inits the MLX.**
+  `SENSORHEAD_IAQ=upstream`, `PrivateDevices=true`. Dashboard binds
+  `--host 127.0.0.1 --port 8081`. Bridge drop-in
+  `SENSORHEAD_URL=http://127.0.0.1:8080`. **Don't bind Python on `:8080`
+  again beside Rust. Don't set `native` or `SENSORHEAD_IAQ=helper` on the
+  public unit while the dashboard still inits the MLX / BME688.**
+
+- **`SENSORHEAD_IAQ` defaults to `upstream`.** The stdio helper is exclusive
+  on 0x77 and writes the same `bsec_state.json` shape. `--doctor` only
+  checks `import bme68x`. **Don't run the helper beside the dashboard.
+  Don't point `SENSORHEAD_PYTHON` at the old venv. Don't invent a second
+  state file during a probe — reuse the live `SENSORHEAD_DATA_DIR`.**
 
 - **`SENSORHEAD_THERMAL` defaults to `upstream`.** Native MLX90640 I2C is real
   (`mlx9064x` + `/dev/i2c-N`) but exclusive. Thin S4 still keeps
