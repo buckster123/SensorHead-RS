@@ -86,6 +86,12 @@ curl -sS -o /tmp/night.jpg -D- http://127.0.0.1:18081/api/capture/night
 sudo systemctl start sensorhead-dashboard
 ```
 
+**Live on apex1 (2026-08-18):** doctor `cameras.ok` on `/usr/bin/python3`
+(apt picamera2 + libcamera + IMX500). Exclusive `:18081` helper: status
+named both sensors, visual 2028×1520 / night 2304×1296 JPEGs, all
+bundled `.rpk` installed, EfficientDet returned detections
+(`source=helper`). Public unit stayed `SENSORHEAD_CAMERAS=upstream`.
+
 ## Cameras (Python wall on the Pi)
 
 Still capture and IMX500 inference default to the Python dashboard
