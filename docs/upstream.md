@@ -87,7 +87,7 @@ What this means for Rust:
 
 | Piece | Why it can be Rust |
 |-------|--------------------|
-| MLX90640 | Plain I2C @ 0x33. Adafruit Blinka is convenience. Discard first 2 frames; 400 kHz I2C. |
+| MLX90640 | Plain I2C @ 0x33. Native path is `SENSORHEAD_THERMAL=native` (`mlx9064x`). Discard first 2 frames. Default stays Python while it owns the bus. |
 | Ironbow | Pure LUT — already reimplemented in ApexOS-RS `ui-slint` for the 32×24 grid |
 | IAQ bands / accuracy labels | Pure tables in `environment.py` |
 | FastAPI dashboard, MCP, bridge, sentinel policy | Application code |

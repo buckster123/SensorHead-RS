@@ -11,5 +11,12 @@ serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 
+# MLX90640 is not a vendor wall (charter D2). linux-only; the HTTP face
+# still defaults to upstream so a sidecar with PrivateDevices=true never
+# opens the bus.
+[target.'cfg(target_os = "linux")'.dependencies]
+linux-embedded-hal = "0.3"
+mlx9064x = "0.2.1"
+
 [dev-dependencies]
 serde_json.workspace = true

@@ -31,6 +31,7 @@ Optional knobs in `/etc/sensorhead/env` (`0600`, root-owned):
 ```
 SENSORHEAD_BIND=127.0.0.1:18080
 SENSORHEAD_UPSTREAM=http://127.0.0.1:8080
+# SENSORHEAD_THERMAL=upstream   # default — do not set native on this unit
 ```
 
 ## Cameras (Python wall on the Pi)

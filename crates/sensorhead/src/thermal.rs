@@ -49,6 +49,45 @@ impl ThermalBody {
         Ok(body)
     }
 
+    /// Build the `:8080` thermal body from a 768-float °C frame.
+    /// Clamps and rounds like the Python original.
+    pub fn from_celsius_frame(frame: Vec<f32>, read_time_ms: f32) -> crate::Result<Self> {
+        if frame.len() != THERMAL_PIXELS {
+            return Err(crate::Error::ThermalFrameLen {
+                got: frame.len(),
+                expected: THERMAL_PIXELS,
+            });
+        }
+        let frame: Vec<f32> = frame.into_iter().map(clamp_celsius).map(round1).collect();
+        let (min_c, max_c, avg_c) = frame_stats(&frame).expect("non-empty frame");
+        let mut extra = serde_json::Map::new();
+        extra.insert(
+            "read_time_ms".into(),
+            serde_json::json!(((read_time_ms * 10.0).round() / 10.0)),
+        );
+        extra.insert(
+            "timestamp".into(),
+            serde_json::json!(std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map(|d| d.as_secs_f64())
+                .unwrap_or(0.0)),
+        );
+        extra.insert("source".into(), serde_json::json!("native"));
+        Ok(Self {
+            error: false,
+            sensor: Some("MLX90640".into()),
+            status: None,
+            reason: None,
+            frame: Some(frame),
+            rows: Some(THERMAL_ROWS as u32),
+            cols: Some(THERMAL_COLS as u32),
+            min_c: Some(min_c),
+            max_c: Some(max_c),
+            avg_c: Some(avg_c),
+            extra,
+        })
+    }
+
     pub fn unavailable(reason: impl Into<String>) -> Self {
         Self {
             error: true,
@@ -111,5 +150,34 @@ mod tests {
         assert_eq!(lo, 20.0);
         assert_eq!(hi, 22.0);
         assert_eq!(avg, 21.0);
+    }
+
+    #[test]
+    fn from_celsius_frame_is_768_and_tagged_native() {
+        let raw = vec![21.04_f32; THERMAL_PIXELS];
+        let body = ThermalBody::from_celsius_frame(raw, 12.34).unwrap();
+        assert!(!body.error);
+        assert_eq!(body.rows, Some(24));
+        assert_eq!(body.cols, Some(32));
+        assert_eq!(body.frame.as_ref().map(|f| f.len()), Some(768));
+        assert_eq!(body.min_c, Some(21.0));
+        assert_eq!(body.max_c, Some(21.0));
+        assert_eq!(body.avg_c, Some(21.0));
+        assert_eq!(
+            body.extra.get("source").and_then(|v| v.as_str()),
+            Some("native")
+        );
+    }
+
+    #[test]
+    fn from_celsius_frame_rejects_short() {
+        let err = ThermalBody::from_celsius_frame(vec![1.0; 10], 1.0).unwrap_err();
+        match err {
+            crate::Error::ThermalFrameLen {
+                got: 10,
+                expected: 768,
+            } => {}
+            other => panic!("{other:?}"),
+        }
     }
 }

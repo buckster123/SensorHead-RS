@@ -96,7 +96,9 @@ Each with the reason, so a future reader knows it was a decision and not an over
 - FFI shape for the two walls: long-lived Python sidecar, `bindgen` to BSEC C, or
   subprocess to a thin `bme68x` helper? Same question for Picamera2.
 - Does MLX90640 go native Rust in P3 (`embedded-hal` / `i2cdev`) or stay behind the
-  same sidecar as BSEC for one I2C owner?
+  same sidecar as BSEC for one I2C owner? **Answered 2026-08-18:** native exists,
+  gated (`SENSORHEAD_THERMAL=native`). Default stays `upstream` while Python
+  owns the bus. The live sidecar unit keeps `PrivateDevices=true`.
 - House MCP (newline JSON-RPC, no SDK) vs keeping FastMCP until a consumer other
   than ApexOS-RS needs stdio.
 
@@ -111,3 +113,6 @@ Dated entries. A decision changes here first, then in the code.
   = external service).
 - **2026-08-18** — D8 adopted. André: cook with commit-push-merge while tests
   stay green.
+- **2026-08-18** — MLX90640 is native-capable behind `SENSORHEAD_THERMAL`.
+  Default remains the Python sidecar so there is one I2C owner. S4 is when
+  Rust may take the bus (and drop `PrivateDevices` / add `DeviceAllow`).

@@ -37,6 +37,12 @@
   `apex-sensor-bridge` is `PrivateDevices=true` on purpose. **Don't open `/dev/i2c-*`
   or CSI from an ApexOS-RS crate "to simplify".**
 
+- **`SENSORHEAD_THERMAL` defaults to `upstream`.** Native MLX90640 I2C is real
+  (`mlx9064x` + `/dev/i2c-N`) but exclusive. The live `sensorhead-api.service`
+  is `PrivateDevices=true` and must stay that way until S4. **Don't point the
+  sidecar at `native` while `sensorhead-dashboard` still holds the bus. Don't
+  drop `PrivateDevices` on the sidecar "to try native".**
+
 - **Pi 5 I2C needs `i2c-dev`, not just `dtparam=i2c_arm=on`.** Without the module there
   are no `/dev/i2c-*` nodes. ApexOS-RS `install.sh` provisions this when the sensor
   option is selected; it needs a reboot. **Don't debug "no BME688" as a Rust bug until
